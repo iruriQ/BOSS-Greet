@@ -1,8 +1,8 @@
 {
   "name": "boss-auto-apply-userscript",
-  "version": "0.1.0",
+  "version": "0.2.4",
   "private": true,
-  "description": "Lightweight Tampermonkey script for assisted Boss Zhipin job applications.",
+  "description": "Lightweight Tampermonkey script for assisted auto-apply on Boss Zhipin, Liepin and Zhaopin.",
   "scripts": {
     "check": "node --check boss-auto-apply.user.js"
   },

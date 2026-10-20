@@ -4,6 +4,8 @@
 
 脚本会根据当前打开的招聘网站自动切换适配逻辑，三端共用同一个控制面板和筛选配置。
 
+> 本项目基于 [muyuniao](https://github.com/muyuniao/boss-auto-apply) 的 Boss 直聘自动投递脚本二次开发，新增猎聘、智联招聘适配。原版脚本：[Greasy Fork 585275](https://greasyfork.org/zh-CN/scripts/585275)。
+
 ## 文件说明
 
 - `boss-auto-apply.user.js`：可直接安装到 Tampermonkey 的用户脚本。
@@ -12,7 +14,7 @@
 ## 安装与使用
 
 1. 在浏览器中安装 **Tampermonkey / 篡改猴** 插件。
-2. (推荐方式) 访问 [Greasy Fork 脚本安装页面](https://greasyfork.org/zh-CN/scripts/585275-boss%E7%9B%B4%E8%81%98%E8%87%AA%E5%8A%A8%E6%8A%95%E9%80%92%E5%8A%A9%E6%89%8B) 一键安装/更新。也可以选择复制本仓库的 `boss-auto-apply.user.js` 全部代码并在 Tampermonkey 中手动新建保存。
+2. 复制本仓库的 `boss-auto-apply.user.js` 全部代码，在 Tampermonkey 中手动新建并保存。本项目基于 [原版脚本](https://greasyfork.org/zh-CN/scripts/585275-boss%E7%9B%B4%E8%81%98%E8%87%AA%E5%8A%A8%E6%8A%95%E9%80%92%E5%8A%A9%E6%89%8B) 二次开发，发布到 Greasy Fork 后可在此补充一键安装链接。
 3. 自行登录对应招聘网站网页版。
 4. 打开任意一个职位列表页：
    - **Boss 直聘**
@@ -74,7 +76,7 @@ npm run check
 
 ## 💬 社区
 
-本项目认可并链接 [LINUX DO](https://linux.do) 社区。遇到问题或有建议，欢迎 [提交 Issue](https://github.com/ultraplan-bit/Piece/issues)，请附上复现步骤和脱敏截图，不要上传密钥或私人资料。
+本项目认可并链接 [LINUX DO](https://linux.do) 社区。遇到问题或有建议，欢迎 [提交 Issue](https://github.com/ultraplan-bit/boss-auto-apply/issues)，请附上复现步骤和脱敏截图，不要上传密钥或私人资料。
 
 
 ## 开源协议
@@ -87,4 +89,4 @@ npm run check
 
 | 页面整体效果 | 操作控制面板 |
 | :---: | :---: |
-| ![页面整体效果](https://github.com/muyuniao/boss-auto-apply/raw/main/images/screenshot1.png) | ![操作控制面板](https://github.com/muyuniao/boss-auto-apply/raw/main/images/screenshot2.png) |
+| ![页面整体效果](https://github.com/ultraplan-bit/boss-auto-apply/raw/main/images/screenshot1.png) | ![操作控制面板](https://github.com/ultraplan-bit/boss-auto-apply/raw/main/images/screenshot2.png) |

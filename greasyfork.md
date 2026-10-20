@@ -2,7 +2,9 @@
 
 一款面向 **Boss 直聘、猎聘、智联招聘** 职位列表页的 Tampermonkey 自动投递脚本。**专注于真实投递与安全防风控**，去除了繁琐的多余选项，只保留最核心的岗位过滤。同一个面板会自动识别当前平台并切换投递逻辑。
 
-💻 **GitHub 仓库**：[muyuniao/boss-auto-apply](https://github.com/muyuniao/boss-auto-apply) *(欢迎点个 Star ⭐ 或提交 Issue)*
+> 本项目基于 [muyuniao](https://greasyfork.org/zh-CN/scripts/585275) 的 Boss 直聘自动投递脚本二次开发，新增猎聘、智联招聘支持。
+
+💻 **GitHub 仓库**：[ultraplan-bit/boss-auto-apply](https://github.com/ultraplan-bit/boss-auto-apply) *(欢迎点个 Star ⭐ 或提交 Issue)*
 
 ---
 
@@ -46,7 +48,7 @@
 
 ### 📄 开源协议
 
-本项目采用 [MIT License](https://github.com/muyuniao/boss-auto-apply/blob/main/LICENSE) 开源协议。
+本项目采用 [MIT License](https://github.com/ultraplan-bit/boss-auto-apply/blob/main/LICENSE) 开源协议。
 
 ---
 
@@ -54,4 +56,4 @@
 
 | 页面整体效果 | 操作控制面板 |
 | :---: | :---: |
-| ![页面整体效果](https://github.com/muyuniao/boss-auto-apply/raw/main/images/screenshot1.png) | ![操作控制面板](https://github.com/muyuniao/boss-auto-apply/raw/main/images/screenshot2.png) |
+| ![页面整体效果](https://github.com/ultraplan-bit/boss-auto-apply/raw/main/images/screenshot1.png) | ![操作控制面板](https://github.com/ultraplan-bit/boss-auto-apply/raw/main/images/screenshot2.png) |

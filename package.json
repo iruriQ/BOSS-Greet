@@ -4,7 +4,9 @@
   "private": true,
   "description": "Lightweight Tampermonkey script for assisted auto-apply on Boss Zhipin, Liepin and Zhaopin.",
   "scripts": {
-    "check": "node --check boss-auto-apply.user.js"
+    "split:source": "node scripts/split-source.mjs",
+    "build": "node scripts/build.mjs",
+    "check": "npm run build && node --check boss-auto-apply.user.js"
   },
   "license": "MIT",
   "dependencies": {

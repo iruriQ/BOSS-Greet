@@ -6,15 +6,20 @@
 
 > 本项目基于 [muyuniao](https://github.com/muyuniao/boss-auto-apply) 的 Boss 直聘自动投递脚本二次开发，新增猎聘、智联招聘适配。原版脚本：[Greasy Fork 585275](https://greasyfork.org/zh-CN/scripts/585275)。
 
+**一键安装**：[Greasy Fork 601180](https://greasyfork.org/zh-CN/scripts/601180-boss-猎聘-智联-自动投递助手)
+
 ## 文件说明
 
-- `boss-auto-apply.user.js`：可直接安装到 Tampermonkey 的用户脚本。
-- `package.json`：仅用于本地代码语法检查。
+- `boss-auto-apply.user.js`：构建生成的单文件用户脚本，可直接安装到 Tampermonkey。
+- `src/`：按职责拆分的源码模块；开发时以这些文件为准。
+- `scripts/build.mjs`：将源码模块合并为可安装的油猴脚本。
+
+修改源码后运行 `npm run build` 生成发布文件，`npm run check` 会构建并检查生成文件语法。
 
 ## 安装与使用
 
 1. 在浏览器中安装 **Tampermonkey / 篡改猴** 插件。
-2. 复制本仓库的 `boss-auto-apply.user.js` 全部代码，在 Tampermonkey 中手动新建并保存。本项目基于 [原版脚本](https://greasyfork.org/zh-CN/scripts/585275-boss%E7%9B%B4%E8%81%98%E8%87%AA%E5%8A%A8%E6%8A%95%E9%80%92%E5%8A%A9%E6%89%8B) 二次开发，发布到 Greasy Fork 后可在此补充一键安装链接。
+2. 打开 [Greasy Fork 安装页](https://greasyfork.org/zh-CN/scripts/601180-boss-猎聘-智联-自动投递助手) 点击安装；也可以复制本仓库的 `boss-auto-apply.user.js` 全部代码，在 Tampermonkey 中手动新建并保存。
 3. 自行登录对应招聘网站网页版。
 4. 打开任意一个职位列表页：
    - **Boss 直聘**

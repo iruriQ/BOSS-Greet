@@ -339,19 +339,28 @@
     return left.includes(right) || right.includes(left);
   }
 
+  function clickZhaopinElement(element) {
+    const link = element?.closest?.("a[href]");
+    if (!link) return element?.click();
+
+    const preventNavigation = (event) => event.preventDefault();
+    link.addEventListener("click", preventNavigation, true);
+    try {
+      element.click();
+    } finally {
+      link.removeEventListener("click", preventNavigation, true);
+    }
+  }
+
   async function selectZhaopinCard(job) {
     const card = job.card;
     if (!card || !document.contains(card)) return false;
     if (card.classList.contains("job-card--active")) return true;
 
     card.scrollIntoView({ block: "center" });
-    const clickTarget =
-      card.querySelector(
-        ".job-card__title-main, .job-card__title-clamp, .job-card__title-row",
-      ) || card;
-
     try {
-      clickTarget.click();
+      // 点击卡片容器选中职位，避免标题/外层链接触发站内路由跳转。
+      clickZhaopinElement(card);
     } catch (error) {
       // ignore
     }
@@ -381,7 +390,7 @@
       if (!retried && Date.now() > deadline - 4500) {
         retried = true;
         try {
-          card.click();
+          clickZhaopinElement(card);
         } catch (error) {
           // ignore
         }
@@ -792,7 +801,7 @@
 
     const popupWatch = installPopupWatch();
     try {
-      applyButton.click();
+      clickZhaopinElement(applyButton);
     } catch (error) {
       popupWatch.restore();
       throw error;
@@ -937,7 +946,7 @@
     card.scrollIntoView({ block: "center" });
     const popupWatch = installPopupWatch();
     try {
-      button.click();
+      clickZhaopinElement(button);
     } catch (error) {
       popupWatch.restore();
       throw error;
@@ -1049,8 +1058,11 @@
 
   async function goZhaopinNextPage() {
     if (isNewZhaopinLayout()) {
+      const listPanel = document.querySelector(
+        ".job-list-panel, .jobs-list-sort-scroll",
+      );
       const loadMore = Array.from(
-        document.querySelectorAll("button, a"),
+        listPanel?.querySelectorAll("button, a") || [],
       ).find(
         (element) =>
           isElementVisible(element) &&

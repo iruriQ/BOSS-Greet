@@ -38,6 +38,24 @@
       noApplyReason: "未找到聊一聊按钮（可能已沟通或岗位已关闭）",
       supportsOnlineFilter: true,
     },
+    shixiseng: {
+      id: "shixiseng",
+      label: "实习僧",
+      onlineLabel: "仅在线招聘者",
+      exampleUrl: "https://www.shixiseng.com/interns",
+      isListPage: isShixisengListPage,
+      ensureLogin: ensureShixisengLogin,
+      createApplySession: createShixisengApplySession,
+      closeApplySession: closeShixisengApplySession,
+      getCards: getShixisengJobCardElements,
+      buildJob: buildShixisengJobDetail,
+      fetchDetail: fetchShixisengJobDetail,
+      apply: applyShixisengJob,
+      nextPage: goShixisengNextPage,
+      canApply: (job) => Boolean(job?.jobId && !job?.externalApply),
+      noApplyReason: "缺少职位 ID 或该职位需前往外部网站投递",
+      supportsOnlineFilter: true,
+    },
     qiancheng: {
       id: "qiancheng",
       label: "前程无忧",
@@ -79,6 +97,7 @@
     if (/(^|\.)liepin\.com$/i.test(host)) return "liepin";
     if (/(^|\.)zhaopin\.com$/i.test(host)) return "zhaopin";
     if (/(^|\.)51job\.com$/i.test(host)) return "qiancheng";
+    if (/(^|\.)shixiseng\.com$/i.test(host)) return "shixiseng";
     return "unknown";
   }
 

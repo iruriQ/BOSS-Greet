@@ -79,9 +79,17 @@
       log("success", `开始自动投递（${adapter.label}）`);
     }
 
+    let applySession;
     try {
-      await runApplyLoop(adapter);
+      applySession = adapter.createApplySession?.();
+      if (adapter.createApplySession && !applySession) {
+        state.current = "无法打开投递页面";
+        log("error", "浏览器阻止了投递页面，请允许本站弹出窗口后重试。");
+        return;
+      }
+      await runApplyLoop(adapter, applySession);
     } finally {
+      adapter.closeApplySession?.(applySession);
       state.running = false;
       state.stopping = false;
       state.current = state.current || "已结束";
@@ -106,7 +114,7 @@
     renderPanel();
   }
 
-  async function runApplyLoop(adapter) {
+  async function runApplyLoop(adapter, applySession) {
     let pageRound = 1;
 
     while (!state.stopping) {
@@ -135,7 +143,7 @@
           return;
         }
 
-        await handleOneJob(job, adapter);
+        await handleOneJob(job, adapter, applySession);
         saveResumeState();
       }
 
@@ -194,7 +202,7 @@
     return result;
   }
 
-  async function handleOneJob(job, adapter) {
+  async function handleOneJob(job, adapter, applySession) {
     const key = getJobUniqueKey(job);
     state.processedKeys.add(key);
     state.scanned += 1;
@@ -224,7 +232,7 @@
 
       state.matched += 1;
 
-      const result = await adapter.apply(job);
+      const result = await adapter.apply(job, applySession);
       if (result.ok) {
         state.applied += 1;
         recordApplied(job);

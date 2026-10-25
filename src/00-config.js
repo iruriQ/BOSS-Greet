@@ -23,6 +23,10 @@ const APP_ID = "boss-auto-apply-lite";
     activeWithinDays: 14,
     includeDescriptionKeywords: "",
     excludeDescriptionKeywords: "",
+    shixisengResume: "",
+    shixisengReportTime: "",
+    shixisengInternshipTime: "",
+    shixisengDays: "",
     liepinGreeting:
       "您好，我对贵公司发布的这个职位很感兴趣，期待进一步了解。",
   };
@@ -81,6 +85,18 @@ const APP_ID = "boss-auto-apply-lite";
       ".el-message",
       ".el-dialog__wrapper",
       ".van-popup",
+      "[role='dialog']",
+      "[role='alert']",
+      "[role='status']",
+      "[class*='toast']",
+    ],
+  };
+
+  const SHIXISENG_SELECTORS = {
+    jobCards: [".intern-item"],
+    feedback: [
+      ".el-message",
+      ".el-dialog__wrapper",
       "[role='dialog']",
       "[role='alert']",
       "[role='status']",

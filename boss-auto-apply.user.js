@@ -17,6 +17,8 @@
 // @match        https://www.zhaopin.com/jobs*
 // @match        https://*.zhaopin.com/*
 // @match        https://we.51job.com/pc/search*
+// @match        https://www.shixiseng.com/interns*
+// @match        https://resume.shixiseng.com/interns*
 // @run-at       document-idle
 // @grant        GM_getValue
 // @grant        GM_setValue
@@ -54,6 +56,10 @@
     activeWithinDays: 14,
     includeDescriptionKeywords: "",
     excludeDescriptionKeywords: "",
+    shixisengResume: "",
+    shixisengReportTime: "",
+    shixisengInternshipTime: "",
+    shixisengDays: "",
     liepinGreeting:
       "您好，我对贵公司发布的这个职位很感兴趣，期待进一步了解。",
   };
@@ -112,6 +118,18 @@
       ".el-message",
       ".el-dialog__wrapper",
       ".van-popup",
+      "[role='dialog']",
+      "[role='alert']",
+      "[role='status']",
+      "[class*='toast']",
+    ],
+  };
+
+  const SHIXISENG_SELECTORS = {
+    jobCards: [".intern-item"],
+    feedback: [
+      ".el-message",
+      ".el-dialog__wrapper",
       "[role='dialog']",
       "[role='alert']",
       "[role='status']",
@@ -232,6 +250,24 @@
       noApplyReason: "未找到聊一聊按钮（可能已沟通或岗位已关闭）",
       supportsOnlineFilter: true,
     },
+    shixiseng: {
+      id: "shixiseng",
+      label: "实习僧",
+      onlineLabel: "仅在线招聘者",
+      exampleUrl: "https://www.shixiseng.com/interns",
+      isListPage: isShixisengListPage,
+      ensureLogin: ensureShixisengLogin,
+      createApplySession: createShixisengApplySession,
+      closeApplySession: closeShixisengApplySession,
+      getCards: getShixisengJobCardElements,
+      buildJob: buildShixisengJobDetail,
+      fetchDetail: fetchShixisengJobDetail,
+      apply: applyShixisengJob,
+      nextPage: goShixisengNextPage,
+      canApply: (job) => Boolean(job?.jobId && !job?.externalApply),
+      noApplyReason: "缺少职位 ID 或该职位需前往外部网站投递",
+      supportsOnlineFilter: true,
+    },
     qiancheng: {
       id: "qiancheng",
       label: "前程无忧",
@@ -273,6 +309,7 @@
     if (/(^|\.)liepin\.com$/i.test(host)) return "liepin";
     if (/(^|\.)zhaopin\.com$/i.test(host)) return "zhaopin";
     if (/(^|\.)51job\.com$/i.test(host)) return "qiancheng";
+    if (/(^|\.)shixiseng\.com$/i.test(host)) return "shixiseng";
     return "unknown";
   }
 
@@ -958,7 +995,8 @@
       #${PANEL_ID} label { color: #334155; font-size: 12px; }
       #${PANEL_ID} input[type="text"],
       #${PANEL_ID} input[type="number"],
-      #${PANEL_ID} textarea {
+      #${PANEL_ID} textarea,
+      #${PANEL_ID} select {
         width: 100%;
         border: 1px solid #cbd5e1;
         border-radius: 8px;
@@ -969,7 +1007,8 @@
       }
       #${PANEL_ID} textarea { min-height: 42px; resize: vertical; }
       #${PANEL_ID} input:focus,
-      #${PANEL_ID} textarea:focus { border-color: #14b8a6; box-shadow: 0 0 0 3px rgba(20,184,166,.14); }
+      #${PANEL_ID} textarea:focus,
+      #${PANEL_ID} select:focus { border-color: #14b8a6; box-shadow: 0 0 0 3px rgba(20,184,166,.14); }
       #${PANEL_ID} .aj-checks {
         grid-column: 1 / -1;
         display: grid;
@@ -1079,6 +1118,8 @@
       adapter?.id === "liepin"
         ? textAreaHtml("liepinGreeting", "猎聘招呼语（未自动发送时补发）")
         : "";
+    const shixisengSettings =
+      adapter?.id === "shixiseng" ? renderShixisengSettings() : "";
 
     cachedPanel.innerHTML = `
       <div class="aj-header">
@@ -1105,12 +1146,51 @@
           ${textAreaHtml("includeDescriptionKeywords", "岗位详情包含关键词")}
           ${textAreaHtml("excludeDescriptionKeywords", "岗位详情排除关键词")}
           ${liepinGreetingField}
+          ${shixisengSettings}
         </form>
         <div class="aj-actions">
           <button class="aj-btn aj-btn-primary" data-action="start" ${state.running ? "disabled" : ""}>开始</button>
           <button class="aj-btn aj-btn-danger" data-action="stop" ${state.running ? "" : "disabled"}>停止</button>
         </div>
         <div class="aj-logs">${logsHtml}</div>
+      </div>
+    `;
+  }
+
+  function renderShixisengSettings() {
+    const resumeOptions = [
+      ["", "请选择简历"],
+      ["online", "在线简历"],
+      ["attach", "附件简历（同时投递在线简历）"],
+    ]
+      .map(
+        ([value, label]) =>
+          `<option value="${value}" ${config.shixisengResume === value ? "selected" : ""}>${label}</option>`,
+      )
+      .join("");
+    return `
+      <div class="aj-field aj-wide">
+        <label>实习僧投递简历</label>
+        <select name="shixisengResume">${resumeOptions}</select>
+      </div>
+      ${selectHtml("shixisengReportTime", "到岗时间", ["", "1周内", "2周内", "1个月内", "3个月内"], "跟随职位默认")}
+      ${selectHtml("shixisengInternshipTime", "实习时长", ["", "3个月以内", "3-6个月", "6个月以上"], "跟随职位默认")}
+      ${selectHtml("shixisengDays", "每周出勤", ["", "1天", "2天", "3天", "4天", "5天", "6天"], "跟随职位默认")}
+    `;
+  }
+
+  function selectHtml(name, label, options, defaultLabel) {
+    return `
+      <div class="aj-field aj-wide">
+        <label>${label}</label>
+        <select name="${name}">
+          ${options
+            .map(
+              (value) =>
+                `<option value="${htmlEscape(value)}" ${config[name] === value ? "selected" : ""}>${value ? htmlEscape(value) : defaultLabel}</option>`,
+            )
+            .join("")}
+        </select>
       </div>
     `;
   }
@@ -1141,7 +1221,8 @@
         next[key] = Number(field.value);
       } else if (
         field instanceof HTMLTextAreaElement ||
-        field instanceof HTMLInputElement
+        field instanceof HTMLInputElement ||
+        field instanceof HTMLSelectElement
       ) {
         next[key] = field.value;
       }
@@ -1280,9 +1361,17 @@
       log("success", `开始自动投递（${adapter.label}）`);
     }
 
+    let applySession;
     try {
-      await runApplyLoop(adapter);
+      applySession = adapter.createApplySession?.();
+      if (adapter.createApplySession && !applySession) {
+        state.current = "无法打开投递页面";
+        log("error", "浏览器阻止了投递页面，请允许本站弹出窗口后重试。");
+        return;
+      }
+      await runApplyLoop(adapter, applySession);
     } finally {
+      adapter.closeApplySession?.(applySession);
       state.running = false;
       state.stopping = false;
       state.current = state.current || "已结束";
@@ -1307,7 +1396,7 @@
     renderPanel();
   }
 
-  async function runApplyLoop(adapter) {
+  async function runApplyLoop(adapter, applySession) {
     let pageRound = 1;
 
     while (!state.stopping) {
@@ -1336,7 +1425,7 @@
           return;
         }
 
-        await handleOneJob(job, adapter);
+        await handleOneJob(job, adapter, applySession);
         saveResumeState();
       }
 
@@ -1395,7 +1484,7 @@
     return result;
   }
 
-  async function handleOneJob(job, adapter) {
+  async function handleOneJob(job, adapter, applySession) {
     const key = getJobUniqueKey(job);
     state.processedKeys.add(key);
     state.scanned += 1;
@@ -1425,7 +1514,7 @@
 
       state.matched += 1;
 
-      const result = await adapter.apply(job);
+      const result = await adapter.apply(job, applySession);
       if (result.ok) {
         state.applied += 1;
         recordApplied(job);
@@ -5436,6 +5525,392 @@
     } catch (error) {
       return false;
     }
+  }
+
+  // =====================================================================
+  // 实习僧
+  // =====================================================================
+
+  function isShixisengListPage() {
+    return (
+      /^(www|resume)\.shixiseng\.com$/i.test(location.hostname) &&
+      /^\/interns(?:\/|$)/i.test(location.pathname)
+    );
+  }
+
+  function ensureShixisengLogin() {
+    if (/login/i.test(location.href)) {
+      return { ok: false, reason: "请先在浏览器里自行登录实习僧。" };
+    }
+
+    const pageWindow = getPageWindow();
+    const root =
+      pageWindow.$nuxt?.$store ||
+      document.querySelector(".intern-item")?.__vue__?.$store;
+    if (typeof root?.state?.isLogin === "boolean") {
+      return root.state.isLogin
+        ? { ok: true }
+        : { ok: false, reason: "实习僧当前未登录，请先登录。" };
+    }
+
+    const loginEntry = Array.from(document.querySelectorAll("a, button")).find(
+      (element) =>
+        isElementVisible(element) &&
+        /^(登录|登录\/注册|立即登录)$/.test(
+          normalizeText(element.innerText || element.textContent || ""),
+        ),
+    );
+    return loginEntry
+      ? { ok: false, reason: "未检测到实习僧登录状态，请先登录。" }
+      : { ok: true };
+  }
+
+  function getShixisengJobCardElements() {
+    return collectCardsBySelectors(SHIXISENG_SELECTORS.jobCards, {
+      preferVisible: true,
+      firstNonEmpty: true,
+    });
+  }
+
+  function getShixisengDetailUrl(url) {
+    if (!url) return "";
+    try {
+      const detailUrl = new URL(toHttps(url), location.origin);
+      detailUrl.hostname = location.hostname;
+      return detailUrl.href;
+    } catch (error) {
+      return "";
+    }
+  }
+
+  function buildShixisengJobDetail(card, index) {
+    const link = card.querySelector('a[href*="/intern/"]');
+    const itemData = card.__vue__?.$options?.propsData?.itemData || {};
+    const jobId =
+      link?.href.match(/\/intern\/(inn_[\w-]+)/i)?.[1] ||
+      card.getAttribute("data-intern-id") ||
+      itemData.uuid ||
+      "";
+    const detailUrl = getShixisengDetailUrl(
+      link?.href || (jobId ? `/intern/${jobId}` : ""),
+    );
+    const readableText = (value) => {
+      const textarea = document.createElement("textarea");
+      textarea.innerHTML = String(value || "");
+      return normalizeText(
+        textarea.value.replace(
+          /[-\u{F0000}-\u{10FFFD}]/gu,
+          "",
+        ),
+      );
+    };
+    const rawText = readableText(card.innerText || card.textContent || "");
+    const jobName = readableText(link?.innerText || link?.textContent || itemData.name || "");
+    const salaryText = normalizeText(
+      card.querySelector('[class*="day"], [class*="salary"]')?.innerText || "",
+    );
+    const minSalary = Number(itemData.minsalary);
+    const maxSalary = Number(itemData.maxsalary);
+    const salaryRange =
+      minSalary || maxSalary
+        ? `${minSalary}-${maxSalary}`
+        : [itemData.minsal, itemData.maxsal]
+            .map((value) => readableText(value))
+            .join("-");
+    if (!jobId || !jobName) return null;
+
+    return {
+      platform: "shixiseng",
+      index,
+      key: `shixiseng|${jobId}`,
+      card,
+      jobId,
+      jobName,
+      brandName: normalizeText(
+        card.querySelector(".intern-detail__company .title")?.innerText ||
+          itemData.cname ||
+          "",
+      ),
+      salaryDesc: salaryRange !== "-"
+        ? `${salaryRange}/天`
+        : /面议/.test(salaryText)
+          ? "薪资面议"
+          : "",
+      cityName: readableText(
+        card.querySelector(".city")?.innerText || itemData.city || "",
+      ),
+      filterText: [
+        rawText,
+        ...(itemData.c_tags || []),
+        ...(itemData.i_tags || []),
+      ].join(" "),
+      jobLabels: [...(itemData.c_tags || []), ...(itemData.i_tags || [])],
+      rawText,
+      detailUrl,
+      raw: itemData,
+      contact:
+        itemData.deliver === true ||
+        /已投递|已申请/.test(
+          normalizeText(card.querySelector(".resume_apply")?.innerText || rawText),
+        ),
+      isHeadhunter: Boolean(itemData.job_label?.is_hirer),
+      recruiterOnline: true,
+      externalApply: Boolean(itemData.apply_link),
+      applyButton: link,
+    };
+  }
+
+  async function fetchShixisengJobDetail(job) {
+    if (!job.detailUrl) return { postDescription: job.raw?.info || "" };
+    try {
+      const response = await fetch(job.detailUrl, { credentials: "include" });
+      if (!response.ok) return { postDescription: job.raw?.info || "" };
+      const html = await response.text();
+      const doc = new DOMParser().parseFromString(html, "text/html");
+      return {
+        postDescription:
+          normalizeText(doc.querySelector(".intern-detail-page")?.innerText || "") ||
+          job.raw?.info ||
+          "",
+      };
+    } catch (error) {
+      return { postDescription: job.raw?.info || "" };
+    }
+  }
+
+  function createShixisengApplySession() {
+    const tab = getPageWindow().open("about:blank", "_blank");
+    if (!tab) return null;
+    try {
+      tab.document.open();
+      tab.document.write("<!doctype html><title>实习僧自动投递</title><p>正在准备投递…</p>");
+      tab.document.close();
+    } catch (error) {
+      return null;
+    }
+    return tab;
+  }
+
+  function closeShixisengApplySession(session) {
+    try {
+      session?.close();
+    } catch (error) {
+      // ignore
+    }
+  }
+
+  async function applyShixisengJob(job, session) {
+    if (!job.detailUrl) {
+      return { ok: false, skipped: true, message: "未找到职位详情链接" };
+    }
+
+    if (!session) {
+      return { ok: false, limited: true, message: "无法打开投递页面" };
+    }
+
+    const targetUrl = getShixisengDetailUrl(job.detailUrl);
+    if (!targetUrl) {
+      return { ok: false, limited: true, message: "无效职位链接，已停止投递" };
+    }
+
+    try {
+      session.location.href = targetUrl;
+    } catch (error) {
+      return { ok: false, limited: true, message: "无法打开实习僧职位详情页，已停止投递" };
+    }
+
+    const deadline = Date.now() + 30000;
+    let applyClicked = false;
+    let submitClicked = false;
+    while (Date.now() < deadline) {
+      await sleep(500);
+      if (session.closed) {
+        return { ok: false, limited: true, message: "职位详情页已关闭，已停止投递" };
+      }
+      let detailDoc;
+      try {
+        detailDoc = session.document;
+        if (detailDoc.location.hostname !== new URL(targetUrl).hostname) {
+          return {
+            ok: false,
+            limited: true,
+            message: "投递页面意外跳转，已停止后续投递",
+          };
+        }
+      } catch (error) {
+        continue;
+      }
+      if (!detailDoc?.querySelector(".intern-detail-page")) continue;
+
+      const pageVm = detailDoc.querySelector(".intern-detail-page")?.__vue__;
+      const detail = pageVm?.msg;
+      if (!pageVm || !detail) continue;
+      if (String(detail.delivered) === "1") {
+        return submitClicked
+          ? { ok: true, message: "页面已确认该职位投递成功" }
+          : { ok: false, skipped: true, message: "职位此前已投递，跳过重复投递" };
+      }
+      if (applyClicked && /已投递|已申请/.test(detailDoc.querySelector(".resume_apply")?.innerText || "")) {
+        return { ok: true, message: "页面已确认该职位投递成功" };
+      }
+      if (String(detail.overdue) === "1" || detail.intern_status === 1) {
+        return { ok: false, skipped: true, message: "职位已下线或过期，跳过" };
+      }
+
+      const feedback = Array.from(
+        detailDoc.querySelectorAll(SHIXISENG_SELECTORS.feedback.join(",")),
+      )
+        .filter(
+          (element) =>
+            isElementVisible(element) &&
+            (element.matches(".el-message, [role='alert'], [role='status']") ||
+              !element.querySelector(".common-deliver")),
+        )
+        .map((element) => normalizeText(element.innerText || element.textContent || ""))
+        .filter(Boolean)
+        .join("；");
+      if (
+        isLoginOrVerifyText(feedback) ||
+        pageVm.$store?.state?.isLogin !== true
+      ) {
+        return {
+          ok: false,
+          limited: true,
+          message: feedback || "实习僧需要登录或安全验证，请手动处理后重试",
+        };
+      }
+      if (isLimitText(feedback)) {
+        return { ok: false, limited: true, message: feedback.slice(0, 160) };
+      }
+
+      const deliveryDialog = pageVm.$refs.deliverintern;
+      if (!deliveryDialog?.show) {
+        if (!applyClicked) {
+          const applyButton = detailDoc.querySelector(".resume_apply");
+          if (!applyButton || /已投递|已预约/.test(applyButton.innerText || "")) {
+            return { ok: false, skipped: true, message: "职位当前不可投递" };
+          }
+          applyButton.click();
+          applyClicked = true;
+        }
+        continue;
+      }
+
+      const deliverOptions = deliveryDialog.deliverOptions;
+      if (!deliverOptions?.can_deliver || !deliverOptions.resume?.length) {
+        return {
+          ok: false,
+          limited: true,
+          message: "实习僧简历不满足该职位投递要求，请完善简历后重试",
+        };
+      }
+
+      const resume = deliverOptions.resume.find(
+        (item) => item.stype === config.shixisengResume,
+      );
+      if (!resume) {
+        return {
+          ok: false,
+          limited: true,
+          message: `该职位没有${config.shixisengResume === "attach" ? "附件简历" : "在线简历"}选项，请检查实习僧简历设置`,
+        };
+      }
+      if (!resume.deliver_able) {
+        return {
+          ok: false,
+          limited: true,
+          message: "预设简历不符合该职位要求，请修改简历设置或完善简历",
+        };
+      }
+
+      const commonDeliver = detailDoc.querySelector(".common-deliver")?.__vue__;
+      if (!commonDeliver) continue;
+      const selectedIndex = deliverOptions.resume.indexOf(resume);
+      commonDeliver.chooseResume(resume, selectedIndex);
+      if (config.shixisengReportTime) {
+        if (!commonDeliver.inOptions.some((item) => item.label === config.shixisengReportTime)) {
+          return { ok: false, limited: true, message: "该职位不支持设置的到岗时间，已暂停" };
+        }
+        commonDeliver.report_time = config.shixisengReportTime;
+      }
+      if (config.shixisengInternshipTime) {
+        if (!commonDeliver.timeOptions.some((item) => item.label === config.shixisengInternshipTime)) {
+          return { ok: false, limited: true, message: "该职位不支持设置的实习时长，已暂停" };
+        }
+        commonDeliver.internship_time = config.shixisengInternshipTime;
+      }
+      if (config.shixisengDays) {
+        if (!commonDeliver.olOptions.some((item) => item.label === config.shixisengDays)) {
+          return { ok: false, limited: true, message: "该职位不支持设置的每周出勤，已暂停" };
+        }
+        commonDeliver.days = config.shixisengDays;
+      }
+
+      if (submitClicked) {
+        if (deliveryDialog.deliverErrorMsg) {
+          const message = normalizeText(deliveryDialog.deliverErrorMsg).slice(0, 160);
+          return {
+            ok: false,
+            limited: isLimitText(message) || isLoginOrVerifyText(message),
+            message,
+          };
+        }
+        if (
+          String(detail.delivered) === "1" ||
+          deliveryDialog.deliverResult === "success"
+        ) {
+          return { ok: true, message: "实习僧已确认投递" };
+        }
+        continue;
+      }
+
+      if (!submitClicked) {
+        const submitButton = Array.from(
+          detailDoc.querySelectorAll(".deliver-dialog-box .common-deliver__footer .btn"),
+        ).find(
+          (button) =>
+            isElementVisible(button) &&
+            !isDisabled(button) &&
+            normalizeText(button.innerText || button.textContent || "") === "确认投递",
+        );
+        if (!submitButton) continue;
+        submitButton.click();
+        submitClicked = true;
+      }
+      if (deliveryDialog.deliverErrorMsg) {
+        const message = normalizeText(deliveryDialog.deliverErrorMsg).slice(0, 160);
+        return {
+          ok: false,
+          limited: isLimitText(message) || isLoginOrVerifyText(message),
+          message,
+        };
+      }
+      if (
+        String(detail.delivered) === "1" ||
+        deliveryDialog.deliverResult === "success"
+      ) {
+        return { ok: true, message: "实习僧已确认投递" };
+      }
+    }
+
+    return { ok: false, message: "等待实习僧投递窗口超时" };
+  }
+
+  async function goShixisengNextPage() {
+    const pagination = document.querySelector(".el-pagination")?.__vue__;
+    if (!pagination || isDisabled(document.querySelector(".el-pagination .btn-next"))) {
+      return false;
+    }
+    const currentPage = pagination.internalCurrentPage;
+    pagination.next();
+    for (let attempt = 0; attempt < 20; attempt += 1) {
+      await sleep(250);
+      if (pagination.internalCurrentPage !== currentPage) {
+        log("debug", `实习僧已切换到第 ${pagination.internalCurrentPage} 页`);
+        return true;
+      }
+    }
+    return false;
   }
 
   // =====================================================================

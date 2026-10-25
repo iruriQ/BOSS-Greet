@@ -106,7 +106,8 @@
       #${PANEL_ID} label { color: #334155; font-size: 12px; }
       #${PANEL_ID} input[type="text"],
       #${PANEL_ID} input[type="number"],
-      #${PANEL_ID} textarea {
+      #${PANEL_ID} textarea,
+      #${PANEL_ID} select {
         width: 100%;
         border: 1px solid #cbd5e1;
         border-radius: 8px;
@@ -117,7 +118,8 @@
       }
       #${PANEL_ID} textarea { min-height: 42px; resize: vertical; }
       #${PANEL_ID} input:focus,
-      #${PANEL_ID} textarea:focus { border-color: #14b8a6; box-shadow: 0 0 0 3px rgba(20,184,166,.14); }
+      #${PANEL_ID} textarea:focus,
+      #${PANEL_ID} select:focus { border-color: #14b8a6; box-shadow: 0 0 0 3px rgba(20,184,166,.14); }
       #${PANEL_ID} .aj-checks {
         grid-column: 1 / -1;
         display: grid;
@@ -227,6 +229,8 @@
       adapter?.id === "liepin"
         ? textAreaHtml("liepinGreeting", "猎聘招呼语（未自动发送时补发）")
         : "";
+    const shixisengSettings =
+      adapter?.id === "shixiseng" ? renderShixisengSettings() : "";
 
     cachedPanel.innerHTML = `
       <div class="aj-header">
@@ -253,12 +257,51 @@
           ${textAreaHtml("includeDescriptionKeywords", "岗位详情包含关键词")}
           ${textAreaHtml("excludeDescriptionKeywords", "岗位详情排除关键词")}
           ${liepinGreetingField}
+          ${shixisengSettings}
         </form>
         <div class="aj-actions">
           <button class="aj-btn aj-btn-primary" data-action="start" ${state.running ? "disabled" : ""}>开始</button>
           <button class="aj-btn aj-btn-danger" data-action="stop" ${state.running ? "" : "disabled"}>停止</button>
         </div>
         <div class="aj-logs">${logsHtml}</div>
+      </div>
+    `;
+  }
+
+  function renderShixisengSettings() {
+    const resumeOptions = [
+      ["", "请选择简历"],
+      ["online", "在线简历"],
+      ["attach", "附件简历（同时投递在线简历）"],
+    ]
+      .map(
+        ([value, label]) =>
+          `<option value="${value}" ${config.shixisengResume === value ? "selected" : ""}>${label}</option>`,
+      )
+      .join("");
+    return `
+      <div class="aj-field aj-wide">
+        <label>实习僧投递简历</label>
+        <select name="shixisengResume">${resumeOptions}</select>
+      </div>
+      ${selectHtml("shixisengReportTime", "到岗时间", ["", "1周内", "2周内", "1个月内", "3个月内"], "跟随职位默认")}
+      ${selectHtml("shixisengInternshipTime", "实习时长", ["", "3个月以内", "3-6个月", "6个月以上"], "跟随职位默认")}
+      ${selectHtml("shixisengDays", "每周出勤", ["", "1天", "2天", "3天", "4天", "5天", "6天"], "跟随职位默认")}
+    `;
+  }
+
+  function selectHtml(name, label, options, defaultLabel) {
+    return `
+      <div class="aj-field aj-wide">
+        <label>${label}</label>
+        <select name="${name}">
+          ${options
+            .map(
+              (value) =>
+                `<option value="${htmlEscape(value)}" ${config[name] === value ? "selected" : ""}>${value ? htmlEscape(value) : defaultLabel}</option>`,
+            )
+            .join("")}
+        </select>
       </div>
     `;
   }
@@ -289,7 +332,8 @@
         next[key] = Number(field.value);
       } else if (
         field instanceof HTMLTextAreaElement ||
-        field instanceof HTMLInputElement
+        field instanceof HTMLInputElement ||
+        field instanceof HTMLSelectElement
       ) {
         next[key] = field.value;
       }

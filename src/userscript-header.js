@@ -17,6 +17,8 @@
 // @match        https://www.zhaopin.com/jobs*
 // @match        https://*.zhaopin.com/*
 // @match        https://we.51job.com/pc/search*
+// @match        https://www.shixiseng.com/interns*
+// @match        https://resume.shixiseng.com/interns*
 // @run-at       document-idle
 // @grant        GM_getValue
 // @grant        GM_setValue

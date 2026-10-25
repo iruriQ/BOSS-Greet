@@ -14,6 +14,7 @@ const sourceFiles = [
   "06-boss.js",
   "07-liepin.js",
   "08-zhaopin.js",
+  "10-qiancheng.js",
   "09-bootstrap.js",
 ];
 

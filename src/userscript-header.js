@@ -1,8 +1,8 @@
 // ==UserScript==
-// @name         Boss/猎聘/智联 自动投递助手
+// @name         Boss/猎聘/智联/前程无忧 自动投递助手
 // @namespace    https://github.com/ultraplan-bit/boss-auto-apply
-// @version      0.2.4
-// @description  在 Boss 直聘、猎聘、智联招聘的职位列表页按筛选规则自动批量投递（基于 muyuniao 原脚本二次开发）。
+// @version      0.2.5
+// @description  在 Boss 直聘、猎聘、智联招聘、前程无忧的职位列表页按筛选规则自动批量投递（基于 muyuniao 原脚本二次开发）。
 // @author       plove
 // @homepageURL  https://github.com/ultraplan-bit/boss-auto-apply
 // @supportURL   https://github.com/ultraplan-bit/boss-auto-apply/issues
@@ -16,6 +16,7 @@
 // @match        https://www.zhaopin.com/sou*
 // @match        https://www.zhaopin.com/jobs*
 // @match        https://*.zhaopin.com/*
+// @match        https://we.51job.com/pc/search*
 // @run-at       document-idle
 // @grant        GM_getValue
 // @grant        GM_setValue

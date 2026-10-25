@@ -38,6 +38,22 @@
       noApplyReason: "未找到聊一聊按钮（可能已沟通或岗位已关闭）",
       supportsOnlineFilter: true,
     },
+    qiancheng: {
+      id: "qiancheng",
+      label: "前程无忧",
+      onlineLabel: "仅在线招聘者",
+      exampleUrl: "https://we.51job.com/pc/search",
+      isListPage: isQianchengListPage,
+      ensureLogin: ensureQianchengLogin,
+      getCards: getQianchengJobCardElements,
+      buildJob: buildQianchengJobDetail,
+      fetchDetail: fetchQianchengJobDetail,
+      apply: applyQianchengJob,
+      nextPage: goQianchengNextPage,
+      canApply: (job) => Boolean(job?.jobId && !job?.externalApply),
+      noApplyReason: "缺少职位 ID 或该职位需前往官网投递",
+      supportsOnlineFilter: true,
+    },
     zhaopin: {
       id: "zhaopin",
       label: "智联招聘",
@@ -62,6 +78,7 @@
     if (/(^|\.)zhipin\.com$/i.test(host)) return "boss";
     if (/(^|\.)liepin\.com$/i.test(host)) return "liepin";
     if (/(^|\.)zhaopin\.com$/i.test(host)) return "zhaopin";
+    if (/(^|\.)51job\.com$/i.test(host)) return "qiancheng";
     return "unknown";
   }
 
@@ -69,9 +86,10 @@
     return ADAPTERS[getPlatformId()] || null;
   }
 
-  // 平台自身的每日投递上限；智联招聘站内限制为 100 次/天。
+  // 平台自身的每日投递上限；智联招聘和前程无忧约为 100 次/天。
   const PLATFORM_DAILY_LIMITS = {
     zhaopin: 100,
+    qiancheng: 100,
   };
 
   function getDailyLimit(adapter = getAdapter()) {

@@ -203,7 +203,7 @@
 
     try {
       // 详情页只用于「职位详情关键词」过滤；没有配置关键词时没必要抓取
-      // （智联详情页单页 1.5MB 左右，逐个抓取会显著拖慢投递速度）。
+      // （智联详情页单页 1.5MB 左右，逐个抓取会显著拖慢投递速度；前程无忧已从列表数据读取 JD）。
       const needJobDetail =
         config.fetchDetail &&
         (splitKeywords(config.includeDescriptionKeywords).length > 0 ||

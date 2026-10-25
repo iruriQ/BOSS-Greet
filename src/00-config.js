@@ -5,7 +5,7 @@ const APP_ID = "boss-auto-apply-lite";
   const RESUME_KEY = `${APP_ID}:resume`;
   const PANEL_ID = `${APP_ID}-panel`;
   const STYLE_ID = `${APP_ID}-style`;
-  const VERSION = "0.2.4";
+  const VERSION = "0.2.5";
 
   const DEFAULT_CONFIG = {
     autoNextPage: true,
@@ -71,6 +71,21 @@ const APP_ID = "boss-auto-apply-lite";
     ],
     chatEditor:
       'textarea, [contenteditable]:not([contenteditable="false"]), [role="textbox"][aria-multiline="true"], #chat-input, input[type="text"], input:not([type])',
+  };
+
+  const QIANCHENG_SELECTORS = {
+    jobCards: [".joblist-item"],
+    searchPagination: ".pageation .el-pagination",
+    applyButton: "button.btn.apply",
+    feedback: [
+      ".el-message",
+      ".el-dialog__wrapper",
+      ".van-popup",
+      "[role='dialog']",
+      "[role='alert']",
+      "[role='status']",
+      "[class*='toast']",
+    ],
   };
 
   const ZHAOPIN_SELECTORS = {

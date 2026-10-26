@@ -22,6 +22,7 @@
     state.applied = 0;
     state.skipped = 0;
     state.failed = 0;
+    state.previewed = 0;
     state.platformRemainingQuota = null;
     state.current = "准备开始";
     state.processedKeys = new Set();
@@ -30,6 +31,7 @@
   async function startApply(options = {}) {
     if (state.running) return;
     const adapter = getAdapter();
+    if (state.previewing) return;
     if (!adapter || !adapter.isListPage()) {
       log(
         "warn",
@@ -49,8 +51,25 @@
       return;
     }
 
+    if (adapter.id === "boss") {
+      try { validateBossDistanceConfig(config); } catch (error) {
+        log("error", error.message);
+        return;
+      }
+    }
+    if (adapter.id === "boss" && config.bossPersonalizedGreeting && !getGreetingFacts().length) {
+      log("error", "请先填写我的简介与真实经历，再生成岗位招呼语");
+      return;
+    }
+    if (adapter.id === "boss" && config.bossPersonalizedGreeting && !config.bossGreetingPreviewOnly) {
+      try { validateGreetingReviewConfig(config); } catch (error) {
+        log("error", `尚不能自动发送：${error.message || error}。配置后即可按“生成→校对→发送”自动处理。`);
+        return;
+      }
+    }
+
     const history = loadHistory();
-    if (history.dailyCount >= getDailyLimit(adapter)) {
+    if (!isGreetingPreviewRun(adapter) && history.dailyCount >= getDailyLimit(adapter)) {
       log("warn", `已达每日上限（${getDailyLimit(adapter)} 次）`);
       return;
     }
@@ -96,7 +115,7 @@
       clearResumeState();
       log(
         "success",
-        `任务结束：扫描 ${state.scanned}，匹配 ${state.matched}，成功 ${state.applied}，跳过 ${state.skipped}，失败 ${state.failed}`,
+        `任务结束：扫描 ${state.scanned}，匹配 ${state.matched}，预览 ${state.previewed}，成功 ${state.applied}，跳过 ${state.skipped}，失败 ${state.failed}`,
       );
       notify(
         `${adapter.label} 自动投递助手`,
@@ -137,7 +156,7 @@
         }
 
         const history = loadHistory();
-        if (history.dailyCount >= getDailyLimit(adapter)) {
+        if (!isGreetingPreviewRun(adapter) && history.dailyCount >= getDailyLimit(adapter)) {
           state.current = "已达每日上限";
           log("warn", `已达每日上限（${getDailyLimit(adapter)} 次）`);
           return;
@@ -157,9 +176,14 @@
         return;
       }
 
+      state.paginationStopReason = "";
       const moved = await adapter.nextPage();
       if (!moved) {
-        state.current = "没有更多职位";
+        if (state.stopping) {
+          if (state.current === "正在停止，等待当前请求结束") state.current = "已手动停止";
+          return;
+        }
+        state.current = state.paginationStopReason || "没有更多职位";
         return;
       }
 
@@ -210,11 +234,11 @@
     renderPanel();
 
     try {
-      // 详情页只用于「职位详情关键词」过滤；没有配置关键词时没必要抓取
-      // （智联详情页单页 1.5MB 左右，逐个抓取会显著拖慢投递速度；前程无忧已从列表数据读取 JD）。
+      // BOSS 专属话术始终读取 JD；其他平台沿用仅在关键词筛选时读取的策略。
       const needJobDetail =
         config.fetchDetail &&
-        (splitKeywords(config.includeDescriptionKeywords).length > 0 ||
+        ((adapter.id === "boss" && (config.bossPersonalizedGreeting || config.bossDistanceEnabled)) ||
+          splitKeywords(config.includeDescriptionKeywords).length > 0 ||
           splitKeywords(config.excludeDescriptionKeywords).length > 0);
       const detail = needJobDetail
         ? await safeFetchJobDetail(job, adapter)
@@ -232,8 +256,11 @@
 
       state.matched += 1;
 
-      const result = await adapter.apply(job, applySession);
-      if (result.ok) {
+      if (state.stopping) return;
+      const result = await adapter.apply(job, adapter.id === "boss" ? detail : applySession);
+      if (result.preview) {
+        state.previewed += 1;
+      } else if (result.ok) {
         state.applied += 1;
         recordApplied(job);
         if (Number.isFinite(result.remainingQuota)) {
@@ -264,7 +291,7 @@
         );
         await sleep(randomBetween(500, 1200));
         return;
-      } else if (result.limited) {
+      } else if (result.limited || result.needsAttention) {
         state.failed += 1;
         log(
           "error",
@@ -325,6 +352,11 @@
       }
     }
 
+    if (adapter.id === "boss") {
+      const distance = filterBossHomeDistance(job, detail);
+      if (!distance.ok) return distance;
+    }
+
     const platformSkip = adapter.shouldSkip?.(job, detail);
     if (platformSkip?.skip) {
       return { ok: false, reason: platformSkip.reason };
@@ -348,4 +380,8 @@
     const company = normalizeText(job?.brandName) || "未知公司";
     const salary = normalizeText(job?.salaryDesc);
     return `${title} - ${company}${salary ? ` - ${salary}` : ""}`;
+  }
+
+  function isGreetingPreviewRun(adapter) {
+    return adapter?.id === "boss" && config.bossPersonalizedGreeting && config.bossGreetingPreviewOnly;
   }

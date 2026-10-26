@@ -1,11 +1,11 @@
 // ==UserScript==
-// @name         Boss/猎聘/智联/前程无忧 自动投递助手
-// @namespace    https://github.com/ultraplan-bit/boss-auto-apply
-// @version      0.2.5
-// @description  在 Boss 直聘、猎聘、智联招聘、前程无忧的职位列表页按筛选规则自动批量投递（基于 muyuniao 原脚本二次开发）。
-// @author       plove
-// @homepageURL  https://github.com/ultraplan-bit/boss-auto-apply
-// @supportURL   https://github.com/ultraplan-bit/boss-auto-apply/issues
+// @name         BOSS 岗位定制招呼助手
+// @namespace    local.boss-auto-apply.custom
+// @version      0.6.1
+// @description  按规则投递；Boss 根据真实经历和岗位 JD 生成专属招呼语，逐条校对错别字、语序、用词及事实后自动发送。
+// @author       iruriQ (based on plove / muyuniao)
+// @homepageURL  https://github.com/iruriQ/BOSS-Greet
+// @supportURL   https://github.com/iruriQ/BOSS-Greet/issues
 // @license      MIT
 // @match        https://www.zhipin.com/web/geek/job*
 // @match        https://www.zhipin.com/web/geek/jobs*
@@ -25,5 +25,7 @@
 // @grant        GM_addStyle
 // @grant        GM_registerMenuCommand
 // @grant        GM_notification
+// @grant        GM_xmlhttpRequest
+// @connect      *
 // @grant        unsafeWindow
 // ==/UserScript==

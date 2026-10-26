@@ -36,11 +36,18 @@
 
   function loadConfig() {
     const stored = gmGet(CONFIG_KEY, {});
-    return normalizeConfig({ ...DEFAULT_CONFIG, ...(stored || {}) });
+    return normalizeConfig(stored || {});
   }
 
   function normalizeConfig(input) {
     const output = { ...DEFAULT_CONFIG, ...(input || {}) };
+    // 兼容早期私人构建的发送模式；通用版尊重用户保存的预览选择。
+    if (PERSONAL_BUILD && Number(input?.greetingWorkflowVersion || 0) < 2) output.bossGreetingPreviewOnly = false;
+    output.greetingWorkflowVersion = 2;
+    if (PERSONAL_BUILD && Number(input?.greetingIntroVersion || 0) < 1) {
+      output.candidateExperience = DEFAULT_CANDIDATE.experience || "";
+    }
+    output.greetingIntroVersion = 1;
 
     // 强行锁死固定参数，忽略存储的旧数据
     output.maxApplyCount = DEFAULT_CONFIG.maxApplyCount;
@@ -56,6 +63,28 @@
     output.skipAppliedHistory = true;
     output.skipHeadhunter = true;
     output.treatChatRemindAsSuccess = true;
+
+    for (const key of ["candidateIntro", "candidateExperience", "candidateProfile", "greetingAIEndpoint", "greetingAIModel", "greetingAllowedHttpOrigin"]) {
+      output[key] = typeof output[key] === "string" ? output[key] : "";
+    }
+    for (const key of ["bossPersonalizedGreeting", "bossGreetingPreviewOnly", "bossGreetingUseAI", "bossGreetingIncludeAI"]) {
+      output[key] = output[key] !== false;
+    }
+    output.greetingOpening = ["您好", "你好"].includes(output.greetingOpening) ? output.greetingOpening : DEFAULT_CONFIG.greetingOpening;
+    const length = Number(output.bossGreetingMaxLength);
+    output.bossGreetingMaxLength = Number.isFinite(length)
+      ? Math.max(180, Math.min(500, Math.floor(length))) : 360;
+    delete output.greetingAPIKey;
+
+    output.bossDistanceEnabled = output.bossDistanceEnabled === true;
+    const maxDistance = Number(output.bossMaxDistanceKm);
+    output.bossMaxDistanceKm = Number.isFinite(maxDistance) ? maxDistance : 0;
+    const home = output.bossHomeLocation;
+    // 保留一次同步的家庭起点；不会使用浏览器定位来替换。
+    output.bossHomeLocation = home && typeof home === "object" &&
+      home.coordinateSystem === "gcj02" && Number.isFinite(home.longitude) && Number.isFinite(home.latitude)
+      ? { longitude: home.longitude, latitude: home.latitude,
+        coordinateSystem: "gcj02", name: String(home.name || "家庭起点").slice(0, 120) } : null;
 
     return output;
   }

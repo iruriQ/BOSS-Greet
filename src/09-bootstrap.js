@@ -29,12 +29,13 @@
       if (typeof GM_registerMenuCommand !== "function") return;
       const adapter = getAdapter();
       const label = adapter?.label || "招聘网站";
-      GM_registerMenuCommand(`显示/隐藏 ${label} 自动投递面板`, () => {
+      GM_registerMenuCommand(`${BUILD_SUFFIX ? "个人副本：" : ""}显示/隐藏 ${label} 定制招呼面板`, () => {
         if (!cachedPanel) mountPanel();
         state.collapsed = !state.collapsed;
         renderPanel();
       });
-      GM_registerMenuCommand(`停止 ${label} 自动投递`, stopApply);
+      GM_registerMenuCommand(`${BUILD_SUFFIX ? "个人副本：" : ""}停止 ${label} 自动投递`, stopApply);
+      GM_registerMenuCommand(`设置本次 API Key${BUILD_SUFFIX}`, setGreetingSessionKey);
     } catch (error) {
       console.warn(`[${APP_ID}] register menu failed`, error);
     }
@@ -80,6 +81,8 @@
       registerMenuCommands();
       installRouteWatcher();
     }
+
+    if (isBossHomeSetupPage()) { mountPanel(); return; }
 
     if (!adapter.isListPage()) {
       // 新版页面可能异步渲染列表，稍后重试几次。

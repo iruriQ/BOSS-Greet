@@ -1,11 +1,17 @@
-const APP_ID = "boss-auto-apply-lite";
+const APP_ID = "boss-auto-apply-custom"; // @build-identity
+  const PERSONAL_BUILD = false; // @build-variant
+  const BUILD_SUFFIX = PERSONAL_BUILD ? "（个人副本）" : "";
   const CONFIG_KEY = `${APP_ID}:config`;
-  // Boss 继续沿用旧 key，保证历史投递记录不丢失。
+  // 通用版、私人构建和上游脚本分别使用独立存储。
   const HISTORY_KEY = `${APP_ID}:history`;
   const RESUME_KEY = `${APP_ID}:resume`;
   const PANEL_ID = `${APP_ID}-panel`;
   const STYLE_ID = `${APP_ID}-style`;
-  const VERSION = "0.2.5";
+  const VERSION = "0.6.1";
+  // 私人构建时替换此对象；公开源码和普通构建不包含个人简历。
+  const DEFAULT_CANDIDATE = { intro: "", profile: "" }; // @personal-profile
+  const DEFAULT_AI_SERVICE = { endpoint: "", model: "", httpOrigin: "" }; // @personal-service
+  const GREETING_LEDGER_KEY = `${APP_ID}:boss-greetings`;
 
   const DEFAULT_CONFIG = {
     autoNextPage: true,
@@ -27,6 +33,23 @@ const APP_ID = "boss-auto-apply-lite";
     shixisengReportTime: "",
     shixisengInternshipTime: "",
     shixisengDays: "",
+    bossDistanceEnabled: false,
+    bossMaxDistanceKm: 10,
+    bossHomeLocation: null,
+    bossPersonalizedGreeting: true,
+    bossGreetingPreviewOnly: false,
+    greetingWorkflowVersion: 2,
+    candidateIntro: DEFAULT_CANDIDATE.intro,
+    candidateExperience: DEFAULT_CANDIDATE.experience || "",
+    greetingIntroVersion: 1,
+    candidateProfile: DEFAULT_CANDIDATE.profile,
+    bossGreetingMaxLength: 360,
+    bossGreetingUseAI: !PERSONAL_BUILD,
+    bossGreetingIncludeAI: PERSONAL_BUILD,
+    greetingOpening: "您好",
+    greetingAIEndpoint: DEFAULT_AI_SERVICE.endpoint,
+    greetingAIModel: DEFAULT_AI_SERVICE.model,
+    greetingAllowedHttpOrigin: DEFAULT_AI_SERVICE.httpOrigin,
     liepinGreeting:
       "您好，我对贵公司发布的这个职位很感兴趣，期待进一步了解。",
   };
@@ -165,6 +188,8 @@ const APP_ID = "boss-auto-apply-lite";
     applied: 0,
     skipped: 0,
     failed: 0,
+    previewed: 0,
+    lastGreeting: null,
     platformRemainingQuota: null,
     current: "未开始",
     logs: [],
@@ -176,3 +201,5 @@ const APP_ID = "boss-auto-apply-lite";
 
   let config = loadConfig();
   let cachedPanel = null;
+  // 密钥只保留在本次页面会话，不写入配置或站点 localStorage。
+  let greetingAPIKey = "";

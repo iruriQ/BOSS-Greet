@@ -66,6 +66,7 @@
       lid: pickFirstString(raw, ["lid", "listId"]),
       encryptBossId: pickFirstString(raw, [
         "encryptBossId",
+        "encryptUserId",
         "bossId",
         "encryptBossID",
       ]),
@@ -196,7 +197,18 @@
       throw new Error(data.message || `接口返回 code=${data.code}`);
     }
 
-    return data?.zpData?.jobCard || data?.zpData || data?.data || null;
+    const detail = data?.zpData?.jobCard || data?.zpData || data?.data || null;
+    if ((config.bossPersonalizedGreeting && !getGreetingJD(detail)) ||
+        (config.bossDistanceEnabled && !getBossWorkPoint(null, detail))) {
+      const fullResponse = await fetch(`/wapi/zpgeek/job/detail.json?${params.toString()}`, {
+        method: "GET", credentials: "include", headers: buildBossHeaders(),
+      });
+      const fullData = await parseResponse(fullResponse);
+      if (!fullResponse.ok || fullData?.code !== 0) throw new Error("岗位完整详情读取失败");
+      const full = fullData.zpData || {};
+      return { ...detail, ...full, postDescription: getGreetingJD(full) };
+    }
+    return detail;
   }
 
   function bossShouldSkip(_job, detail) {
@@ -239,7 +251,7 @@
     return Number.POSITIVE_INFINITY;
   }
 
-  async function applyBossJob(job) {
+  async function openBossConversation(job) {
     const params = new URLSearchParams({
       securityId: job.securityId,
       jobId: job.encryptJobId,
@@ -418,26 +430,6 @@
     console.log("chatRemindDialog:", getChatRemindDialog(data));
     console.log("raw:", data);
     console.groupEnd();
-  }
-
-  async function goBossNextPageOrScroll() {
-    if (await scrollForMoreJobs("Boss")) return true;
-
-    const nextIcon = document.querySelector(BOSS_SELECTORS.nextIcon);
-    const nextButton =
-      nextIcon?.closest("button, a, li, .btn, .page-next") ||
-      nextIcon?.parentElement;
-    if (
-      nextButton &&
-      !/disabled|disable/.test(nextButton.className || "") &&
-      nextButton.getAttribute("aria-disabled") !== "true"
-    ) {
-      nextButton.click();
-      log("debug", "已点击下一页");
-      return true;
-    }
-
-    return false;
   }
 
   async function scrollForMoreJobs(label) {

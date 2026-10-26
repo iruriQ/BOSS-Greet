@@ -8,3 +8,12 @@ pnpm-debug.log*
 .chrome_debug_profile/
 .claude/
 .mcp.json
+candidate.private.json
+dist-private/
+
+# 本机凭据、个人资料与调试浏览器数据
+.env
+.env.*
+!.env.example
+*.private.json
+.chrome*profile*/

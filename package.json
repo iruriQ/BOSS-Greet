@@ -1,12 +1,17 @@
 {
   "name": "boss-auto-apply-userscript",
-  "version": "0.2.5",
+  "version": "0.6.1",
   "private": true,
-  "description": "Lightweight Tampermonkey script for assisted auto-apply on Boss Zhipin, Liepin, Zhaopin and 51job.",
+  "description": "Configurable greetings and assisted applications on BOSS, Liepin, Zhaopin, 51job and Shixiseng.",
   "scripts": {
     "split:source": "node scripts/split-source.mjs",
     "build": "node scripts/build.mjs",
-    "check": "npm run build && node --check boss-auto-apply.user.js"
+    "build:personal": "node scripts/build.mjs --personal",
+    "test": "node --test tests/*.test.mjs",
+    "test:browser": "node tests/browser-smoke.mjs",
+    "check": "npm run build && node --check boss-auto-apply.user.js",
+    "check:public": "node scripts/check-public.mjs",
+    "docs:screenshots": "npm run build && node scripts/screenshots.mjs"
   },
   "license": "MIT",
   "dependencies": {

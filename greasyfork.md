@@ -2,6 +2,19 @@
 
 默认使用用户填写的固定打招呼用语，无需 AI 或 API。也可选择 AI 定制，根据本人真实经历和每个岗位的招聘要求生成话术，逐条校对后发送。公开版不内置任何人的简历或服务密钥。
 
+## 新手安装
+
+使用电脑上的 Chrome 或 Microsoft Edge，先登录自己的 BOSS 直聘账号。手机 App 内不能直接安装。
+
+1. 打开 [篡改猴官网](https://www.tampermonkey.net/)，选择浏览器，在官方扩展商店安装 Tampermonkey。
+2. 右键篡改猴图标 →「管理扩展程序」→ 开启「允许用户脚本」；没有此项时，按 [官方说明](https://www.tampermonkey.net/faq.php?locale=zh&q=Q209) 开启开发者模式。
+3. 点击 [安装 BOSS Greet 通用版](https://raw.githubusercontent.com/iruriQ/BOSS-Greet/main/boss-auto-apply.user.js)，在篡改猴页面点「安装」。只看到代码时，到篡改猴「管理面板 → 实用工具 → 从 URL 安装」中粘贴该链接安装。
+4. 登录 [BOSS 职位列表](https://www.zhipin.com/web/geek/job)并刷新，看到左下角「BOSS Greet」即安装完成，然后按下面步骤设置、预览再投递。
+
+固定话术、筛选和平台默认招呼无需 AI API；仅 AI 定制需自己的接口、模型和密钥，费用按服务商规则计算。不需要 Node.js、Python、服务器、终端或编程基础，也无需 GitHub 账号。
+
+助手不强制要求 VPN；安装及更新需能访问扩展商店和 GitHub，AI 模式还需能访问自己的接口，是否需要网络工具取决于所处网络。安装后固定模式只需招聘网站能正常访问，GitHub 断连不影响继续使用。
+
 ## 首次使用
 
 1. 登录招聘网站，打开职位列表。

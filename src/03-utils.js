@@ -56,10 +56,7 @@
   }
 
   function splitKeywords(value) {
-    return String(value || "")
-      .split(/[，,\n;]/)
-      .map((item) => normalizeText(item).toLowerCase())
-      .filter(Boolean);
+    return normalizeKeywordEntries(value).map(item => item.toLowerCase());
   }
 
   function textHasAny(text, keywords) {
@@ -85,7 +82,7 @@
       job.filterText,
       Array.isArray(job.jobLabels) ? job.jobLabels.join(" ") : job.jobLabels,
       Array.isArray(job.skills) ? job.skills.join(" ") : job.skills,
-      detail?.postDescription,
+      detail?.postDescription || getGreetingJD(detail),
       detail?.address,
       detail?.activeTimeDesc,
     ]
@@ -378,7 +375,7 @@
   function isLoginOrVerifyText(text) {
     const normalized = normalizeText(text);
     if (!normalized) return false;
-    return /请先登录|登录后|扫码登录|验证码|安全验证|身份验证|账号.*异常|行为异常|临时封禁|封禁/.test(
+    return /请先登录|登录后|扫码登录|验证码|安全验证|身份验证|异常登录|登录异常|环境.*异常|异地登录|账号.*异常|行为异常|临时封禁|封禁/.test(
       normalized,
     );
   }

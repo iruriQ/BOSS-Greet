@@ -1,10 +1,11 @@
 // ==UserScript==
 // @name         BOSS 岗位定制招呼助手
 // @namespace    local.boss-auto-apply.custom
-// @version      0.6.1
-// @description  按规则投递；Boss 根据真实经历和岗位 JD 生成专属招呼语，逐条校对错别字、语序、用词及事实后自动发送。
+// @version      0.9.19
+// @description  固定话术确认后投递，无需 API；可选 AI 按经历和岗位要求定制并校对招呼语，支持距家筛选。
 // @author       iruriQ (based on plove / muyuniao)
 // @homepageURL  https://github.com/iruriQ/BOSS-Greet
+// @downloadURL  none
 // @supportURL   https://github.com/iruriQ/BOSS-Greet/issues
 // @license      MIT
 // @match        https://www.zhipin.com/web/geek/job*
@@ -25,7 +26,9 @@
 // @grant        GM_addStyle
 // @grant        GM_registerMenuCommand
 // @grant        GM_notification
+// @grant        GM_openInTab
 // @grant        GM_xmlhttpRequest
+// @connect      raw.githubusercontent.com
 // @connect      *
 // @grant        unsafeWindow
 // ==/UserScript==

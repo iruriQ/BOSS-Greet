@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 export const root = fileURLToPath(new URL('../', import.meta.url));
-export function harness(extraFiles = [], overrides = {}) {
+export function harness(extraFiles = [], overrides = {}, { bossPacing = false, bossGreetingGuard = false } = {}) {
   const values = new Map();
   const calls = [];
   const context = vm.createContext({
@@ -17,14 +17,20 @@ export function harness(extraFiles = [], overrides = {}) {
     fetch: async (...args) => { calls.push(args); throw new Error('Unexpected request'); },
     ...overrides,
   });
-  const files = ['00-config.js', '02-storage.js', '03-utils.js', '03-greeting.js', '03-proofread.js', '03-distance.js', ...extraFiles];
+  const files = ['00-config.js', '02-storage.js', '03-utils.js', '03-resume.js', '03-greeting.js', '03-proofread.js', '03-distance.js', '03-recovery.js', '03-greeting-ownership.js', '03-updates.js', ...extraFiles];
   vm.runInContext(files.map(file => readFileSync(resolve(root, 'src', file), 'utf8')).join('\n'), context);
   const run = (code) => vm.runInContext(code, context);
   run(`function log(){}; function renderPanel(){}; function formatJob(job){return job.jobName + ' - ' + job.brandName};`);
+  // Most suites isolate filtering/delivery. Real shared-clock pacing is tested
+  // separately with a deterministic advancing clock rather than wall sleeps.
+  if (!bossPacing) run('waitForBossOperation=async()=>{};waitForBossJobGap=async()=>{}');
+  // Delivery suites isolate the platform-setting API; ownership has its own live-code tests.
+  if (!bossGreetingGuard) run('ensureBossNativeGreetingDisabled=async()=>{}');
   return { context, run, values, calls };
 }
 // 下列人物经历、数量和成果均为虚构测试数据。
 export const fixtureProfile = {
+  bossGreetingMode: "ai",
   bossGreetingUseAI: false,
   bossGreetingIncludeAI: true,
   candidateIntro: '我有业务支持与项目协同经验。',

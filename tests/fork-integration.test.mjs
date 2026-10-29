@@ -15,22 +15,18 @@ test('合并后五个平台仍分别识别，BOSS 距家筛选与原有投递适
   assert.equal(h.run('typeof ADAPTERS.shixiseng.createApplySession'),'function');
 });
 
-test('问候选项和实习僧的简历、出勤选项共用控件时保持正确值及标签',()=>{
+test('问候和实习僧配置在规范化及保存后保留完整选项值（实际控件另经浏览器验证）',()=>{
   const h=harness(files);
-  const opening=h.run('selectHtml("greetingOpening","问候",[["您好","您好"],["你好","你好"]])');
-  assert.match(opening, /value="您好" selected/);
-  h.run('config.shixisengDays="3天";config.shixisengResume="attach"');
-  const html=h.run('renderShixisengSettings()');
-  assert.match(html,/value="attach" selected/);
-  assert.match(html,/value="3天" selected/);
-  assert.match(html,/跟随职位默认/);
-  assert.doesNotMatch(html,/value="3"|value="天"/);
+  h.run('saveConfig({...config,greetingOpening:"你好",shixisengDays:"3天",shixisengResume:"attach"},true);config=loadConfig()');
+  assert.equal(h.run('config.greetingOpening'),'你好');
+  assert.equal(h.run('config.shixisengDays'),'3天');
+  assert.equal(h.run('config.shixisengResume'),'attach');
 });
 
 test('BOSS 收到 JD，实习僧收到本轮投递窗口，避免合并后参数串用',async()=>{
   for(const id of ['boss','shixiseng']){
     const h=harness(files);h.context.job={...fixtureJob,platform:id};
-    h.run('applyFilters=()=>({ok:true});sleepHumanDelay=async()=>{};safeFetchJobDetail=async()=>({postDescription:"示例JD"});');
+    h.run('config.bossGreetingMode="ai";applyFilters=()=>({ok:true});sleepHumanDelay=async()=>{};safeFetchJobDetail=async()=>({postDescription:"示例JD"});');
     h.context.session={windowMarker:'demo-session'};
     let argument;
     h.context.adapter={id,apply:async(_job,value)=>{argument=value;return {skipped:true,message:'仅检查参数'}}};

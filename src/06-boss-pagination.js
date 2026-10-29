@@ -32,7 +32,8 @@ function bossPaginationLabel(snapshot) {
   return `卡片${snapshot.cardCount}，待处理${snapshot.pending}，平台页${snapshot.page ?? "未知"}，hasMore=${snapshot.hasMore ?? "未知"}，加载中=${snapshot.loading ?? "未知"}`;
 }
 
-function triggerBossListScroll(snapshot) {
+async function triggerBossListScroll(snapshot) {
+  await waitForBossOperation("read");
   const targets = new Set();
   let node = snapshot.cards[0]?.parentElement;
   for (let depth = 0; node && depth < 16; depth++, node = node.parentElement) {
@@ -62,6 +63,7 @@ function getBossNextPageButton() {
 
 async function goBossNextPageOrScroll({ probe = false } = {}) {
   state.paginationStopReason = "";
+  state.paginationRetryable = false;
   const before = getBossPaginationSnapshot();
   const hasWork = (snapshot) => probe
     ? [...snapshot.ids].some((id) => !before.ids.has(id)) : snapshot.pending > 0;
@@ -70,11 +72,12 @@ async function goBossNextPageOrScroll({ probe = false } = {}) {
     return true;
   }
   const nextButton = !before.known && getBossNextPageButton();
-  if (nextButton) nextButton.click();
+  if (nextButton) { await waitForBossOperation("read"); nextButton.click(); }
   let endStable = 0;
   let last = before;
   // 最多等待30秒；没有新增且状态不明时明确暂停，不假报“没有更多”。
   for (let poll = 0; poll < 60; poll++) {
+    assertBossPlatformReady();
     if (state.stopping) return false;
     last = getBossPaginationSnapshot();
     if (hasWork(last)) {
@@ -90,7 +93,7 @@ async function goBossNextPageOrScroll({ probe = false } = {}) {
     } else {
       endStable = 0;
       if (!nextButton && poll % 20 === 0 && !last.loading) {
-        triggerBossListScroll(last);
+        await triggerBossListScroll(last);
         log("info", `等待加载更多（第${Math.floor(poll / 20) + 1}次检查）：${bossPaginationLabel(last)}`);
       }
     }
@@ -99,6 +102,7 @@ async function goBossNextPageOrScroll({ probe = false } = {}) {
   state.paginationStopReason = last.known && last.hasMore
     ? "平台仍有更多岗位，但加载超时，已暂停（可稍后继续）"
     : "暂未加载到新岗位，未能确认列表结束（可稍后继续）";
+  state.paginationRetryable = true;
   log("warn", `${state.paginationStopReason}；${bossPaginationLabel(last)}`);
   return false;
 }
@@ -108,6 +112,7 @@ async function probeBossPagination() {
   state.previewing = true; state.stopping = false;
   state.current = "只读检查列表加载，不投递"; renderPanel();
   try {
+    beginManualBossAction();
     const loaded = await goBossNextPageOrScroll({ probe: true });
     state.current = loaded ? "已加载更多岗位，未投递" : state.paginationStopReason;
   } catch (error) { state.current = "列表加载检查失败，未投递"; log("warn", `${state.current}：${error.message || error}`); }

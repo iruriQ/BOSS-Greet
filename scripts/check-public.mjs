@@ -1,6 +1,7 @@
 import {execFileSync} from 'node:child_process';
 import {readFile, stat} from 'node:fs/promises';
 import {dirname, resolve} from 'node:path';
+import {homedir} from 'node:os';
 import {fileURLToPath} from 'node:url';
 
 const root=resolve(dirname(fileURLToPath(import.meta.url)),'..');
@@ -26,7 +27,10 @@ for(const file of files) {
   catch(error) { if(error.code==='ENOENT') continue; throw error; }
   if(bytes.includes(0)) continue;
   const text=bytes.toString('utf8');
-  if(/sk-[A-Za-z0-9_-]{20,}|-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/.test(text)) issues.push(`${file}：疑似真实密钥`);
+  // A token must start at a boundary: Tailwind's mask-linear-* utilities contain
+  // the substring "sk-" but are not credentials.
+  if(/(?<![A-Za-z0-9_-])sk-[A-Za-z0-9_-]{20,}|-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/.test(text)) issues.push(`${file}：疑似真实密钥`);
+  if(text.includes(homedir()+'/')) issues.push(`${file}：包含本机用户目录路径`);
   if(privateNeedles.some(needle=>text.includes(needle))) issues.push(`${file}：包含本机私人履历或服务地址`);
 }
 if(issues.length) {

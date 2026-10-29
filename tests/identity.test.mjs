@@ -11,7 +11,8 @@ test('通用构建不内置任何人的履历、年限、家庭地址或服务�
   const result = applyBuildVariant(header, configSource);
   assert.match(result.header, /@name\s+BOSS 岗位定制招呼助手\n/);
   assert.match(result.header, /@namespace\s+local\.boss-auto-apply\.custom/);
-  assert.doesNotMatch(result.header, /@updateURL|@downloadURL/);
+  assert.match(result.header, /@downloadURL\s+none\n/);
+  assert.doesNotMatch(result.header, /@updateURL|@downloadURL\s+https?:/);
   const h = harness();
   for (const key of ['candidateIntro','candidateProfile','candidateExperience','greetingAIEndpoint','greetingAIModel']) {
     assert.equal(h.run(`config.${key}`), '');
@@ -20,6 +21,9 @@ test('通用构建不内置任何人的履历、年限、家庭地址或服务�
   assert.equal(h.run('config.bossDistanceEnabled'), false);
   assert.equal(h.run('config.bossGreetingIncludeAI'), false);
   assert.equal(h.run('config.bossGreetingUseAI'), true);
+  assert.equal(h.run('config.bossGreetingMode'), 'fixed');
+  assert.equal(h.run('config.bossFixedGreeting'), '');
+  assert.equal(h.run('config.bossFixedGreetingConfirmed'), false);
 });
 
 test('私人构建保留既有安装身份、记录键及用户偏好，额外密钥字段不能写入脚本', () => {
@@ -29,7 +33,9 @@ test('私人构建保留既有安装身份、记录键及用户偏好，额外�
     apiKey:'must-never-be-embedded',
   });
   assert.match(result.header, /BOSS 岗位定制招呼助手（个人副本）/);
+  assert.doesNotMatch(result.header, /@match.*(?:51job|shixiseng)/);
   assert.match(result.header, /local\.boss-auto-apply\.personal-copy/);
+  assert.match(result.header, /@downloadURL\s+none\n/);
   assert.doesNotMatch(result.config, /must-never-be-embedded/);
   const storage = readFileSync(new URL('../src/02-storage.js', import.meta.url),'utf8');
   const context = vm.createContext({GM_getValue:(_key,fallback)=>fallback});
@@ -40,6 +46,7 @@ test('私人构建保留既有安装身份、记录键及用户偏好，额外�
   assert.equal(value('config.candidateExperience'),'五年以上工作经验');
   assert.equal(value('config.bossGreetingIncludeAI'),true);
   assert.equal(value('config.bossGreetingUseAI'),false);
+  assert.equal(value('config.bossGreetingMode'),'ai');
   assert.equal(value('normalizeConfig({bossGreetingPreviewOnly:true}).bossGreetingPreviewOnly'),false);
   assert.equal(value('normalizeConfig({bossGreetingPreviewOnly:true,greetingWorkflowVersion:2}).bossGreetingPreviewOnly'),true);
   assert.throws(()=>applyBuildVariant(header,configSource,{intro:'',profile:''}),/非空/);

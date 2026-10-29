@@ -90,14 +90,14 @@ function chatDocument({ status = 1, wrongBoss = false, draft = '' } = {}) {
   const message = { isSelf: true, status, text: '专属招呼语' };
   const parent = { __vue__: { conversation$: { encryptBossId: wrongBoss ? 'wrong' : fixtureJob.encryptBossId, jobId: fixtureJob.encryptJobId } }, parentElement: null };
   const editor = { tagName: 'DIV', parentElement: parent, textContent: draft, focus() {}, dispatchEvent() {} };
-  const button = { className: '', hasAttribute: () => false, getAttribute: () => null, click() { clicks++; } };
+  const button = { className: '', hasAttribute: () => false, getAttribute: () => null, click() { clicks++; message.text=editor.textContent; } };
   const doc = {
     defaultView: { Event: class {} },
     querySelector(selector) { return selector === '.btn-send' ? button : editor; },
     querySelectorAll() { return clicks ? [{ __vue__: { message } }] : []; },
   };
   const frame = { contentDocument: doc, style: {}, remove() {} };
-  return { doc, document: { createElement: () => frame, body: { appendChild() {} }, cookie: '' }, clicks: () => clicks };
+  return { doc, editor, button, conversation:parent.__vue__.conversation$, document: { createElement: () => frame, body: { appendChild() {} }, cookie: '' }, clicks: () => clicks };
 }
 test('原生聊天发送核对招聘者及岗位，服务器确认状态才算成功', async () => {
   const chat = chatDocument();
@@ -114,6 +114,149 @@ test('错误招聘者、已有草稿时不点击发送；待发送或失败气�
     await assert.rejects(h.run('sendBossGreetingInChat(job, "专属招呼语", review)'));
     assert.equal(chat.clicks(), options.wrongBoss || options.draft ? 0 : 1);
   }
+});
+
+test('发送按钮延迟4秒启用时等待稳定后发送，只有一次点击',async()=>{
+  const chat=chatDocument();chat.button.disabled=true;
+  const h=setup({document:chat.document});let elapsed=0;
+  h.context.sleep=async ms=>{elapsed+=ms;if(elapsed>=4000)chat.button.disabled=false;};
+  h.run('const review={status:"passed",reviewedText:"专属招呼语",checks:["typos","grammar","wording","facts","relevance"]}');
+  assert.equal((await h.run('sendBossGreetingInChat(job,"专属招呼语",review)')).confirmed,true);
+  assert.equal(chat.clicks(),1);assert.equal(elapsed,4500);
+});
+
+test('输入被前端清空时只重填空框，不绕过校对且只点击一次',async()=>{
+  const chat=chatDocument();let inputs=0;
+  chat.editor.dispatchEvent=()=>{if(++inputs===1)chat.editor.textContent='';};
+  const h=setup({document:chat.document});
+  h.run('const review={status:"passed",reviewedText:"专属招呼语",checks:["typos","grammar","wording","facts","relevance"]}');
+  assert.equal((await h.run('sendBossGreetingInChat(job,"专属招呼语",review)')).confirmed,true);
+  assert.equal(inputs,2);assert.equal(chat.clicks(),1);
+});
+
+test('按钮一直禁用或不存在时等待10秒，明确记为未点击发送',async()=>{
+  for(const missing of [false,true]){
+    const chat=chatDocument();chat.button.disabled=true;
+    if(missing){const query=chat.doc.querySelector;chat.doc.querySelector=selector=>selector==='.btn-send'?null:query(selector);}
+    const h=setup({document:chat.document});let elapsed=0;h.context.sleep=async ms=>{elapsed+=ms;};
+    h.run('const review={status:"passed",reviewedText:"专属招呼语",checks:["typos","grammar","wording","facts","relevance"]}');
+    await assert.rejects(h.run('sendBossGreetingInChat(job,"专属招呼语",review)'),error=>{
+      assert.equal(error.code,'BOSS_GREETING_NOT_SENT');assert.equal(error.sendAttempted,false);
+      assert.match(error.message,missing?/未找到发送按钮/:/发送按钮仍不可用/);return true;
+    });
+    assert.equal(chat.clicks(),0);assert.equal(elapsed,10000);
+  }
+});
+
+test('按钮未就绪的岗位保留未发送记录，继续下一岗位且重跑不重复开聊',async()=>{
+  const chat=chatDocument();chat.button.disabled=true;
+  const h=setup({document:chat.document});h.context.detail=detail;
+  h.run('let opened=0;openBossConversation=async()=>{opened++;return {ok:true}}');
+  h.context.adapter={id:'boss',canApply:()=>true,fetchDetail:async()=>detail,apply:(job,value)=>h.context.applyBossJob(job,value)};
+  await h.run('handleOneJob(job,adapter)');
+  assert.equal(h.run('state.stopping'),false);assert.equal(h.run('state.skipped'),1);assert.equal(h.run('state.failed'),0);
+  assert.equal(h.run('loadBossGreetingLedger()[job.encryptBossId].status'),'not-sent');
+  assert.equal(h.run('loadBossGreetingLedger()[job.encryptBossId].sendAttempted'),false);
+  assert.ok(h.run('loadBossGreetingLedger()[job.encryptBossId].expectedText'));
+  assert.equal(chat.clicks(),0);assert.equal(h.run('opened'),1);
+  h.context.nextJob={...fixtureJob,encryptBossId:'boss-b',encryptJobId:'job-b',securityId:'sec-b',lid:'lid-b'};
+  chat.editor.textContent='';chat.button.disabled=false;chat.conversation.encryptBossId='boss-b';chat.conversation.jobId='job-b';
+  await h.run('handleOneJob(nextJob,adapter)');
+  assert.equal(h.run('state.applied'),1);assert.equal(h.run('loadHistory().dailyCount'),2);
+  assert.equal(chat.clicks(),1);assert.equal(h.run('opened'),2);
+  assert.equal((await h.run('applyBossJob(job,detail)')).skipped,true);
+  assert.equal(chat.clicks(),1);assert.equal(h.run('opened'),2);
+});
+
+test('等待中出现其他输入内容、会话改变或手动停止时不覆盖、不点击',async()=>{
+  for(const reason of ['draft','identity','stop']){
+    const chat=chatDocument();chat.button.disabled=true;
+    const h=setup({document:chat.document});
+    h.context.sleep=async()=>{if(reason==='draft')chat.editor.textContent='用户新草稿';if(reason==='identity')chat.conversation.encryptBossId='other';if(reason==='stop')h.run('state.stopping=true');};
+    h.run('const review={status:"passed",reviewedText:"专属招呼语",checks:["typos","grammar","wording","facts","relevance"]}');
+    await assert.rejects(h.run('sendBossGreetingInChat(job,"专属招呼语",review)'),error=>{
+      assert.notEqual(error.code,'BOSS_GREETING_NOT_SENT');assert.equal(error.sendAttempted,false);return true;
+    });
+    assert.equal(chat.clicks(),0);
+    if(reason==='draft')assert.equal(chat.editor.textContent,'用户新草稿');
+  }
+});
+
+test('点击调用后即使抛错也保持未确认暂停，不能归为未发送而继续',async()=>{
+  const chat=chatDocument();const click=chat.button.click;
+  chat.button.click=()=>{click();throw Error('模拟点击后异常');};
+  const h=setup({document:chat.document});h.context.detail=detail;
+  h.run('openBossConversation=async()=>({ok:true})');
+  const result=await h.run('applyBossJob(job,detail)');
+  assert.equal(result.needsAttention,true);assert.notEqual(result.skipped,true);
+  assert.equal(h.run('loadBossGreetingLedger()[job.encryptBossId].status'),'unconfirmed');
+  assert.equal(h.run('loadBossGreetingLedger()[job.encryptBossId].sendAttempted'),true);
+  assert.equal(chat.clicks(),1);
+});
+
+const quotaDialog=()=>({remindType:2,buttonList:[{text:'好',webUrl:'/wapi/zpgeek/friend/add.json?jobId=job-a&securityId=sec-a&cid=1'}]});
+const quotaText='温馨提示；您今天已与120位BOSS沟通，还剩30次沟通机会哦';
+function quotaSetup({message=quotaText,remainingQuota=30,wrongBoss=false,historyOK=true}={}){
+  const chat=chatDocument({wrongBoss});let opened=0,reads=0;
+  const h=setup({document:chat.document});h.context.detail=detail;
+  h.context.contact={ok:true,softSuccess:true,message,remainingQuota,raw:{zpData:{bizData:{chatRemindDialog:quotaDialog()}}}};
+  h.context.fetch=async()=>({ok:true,status:200,text:async()=>JSON.stringify({code:0})});
+  h.context.openBossConversation=async()=>{opened++;return h.context.contact;};
+  chat.conversation.friendId=99;chat.conversation.friendSource=0;
+  chat.doc.defaultView._PAGE={uid:42};chat.doc.defaultView.AbortController=AbortController;
+  chat.doc.defaultView.fetch=async(url,options)=>{
+    reads++;assert.match(url,/^\/wapi\/zpchat\/geek\/historyMsg\?/);assert.equal(options.method,'GET');
+    return {ok:historyOK,status:historyOK?200:503,json:async()=>({code:0,zpData:{messages:[]}})};
+  };
+  return {...h,chat,opened:()=>opened,reads:()=>reads};
+}
+
+test('120位还剩30次提醒经同一会话只读核验后继续，开聊和发送各一次',async()=>{
+  const h=quotaSetup();
+  const result=await h.run('applyBossJob(job,detail)');
+  assert.equal(result.ok,true);assert.equal(result.softSuccess,false);assert.equal(result.remainingQuota,30);
+  assert.equal(h.opened(),1);assert.equal(h.reads(),1);assert.equal(h.chat.clicks(),1);
+  assert.equal(h.run('loadHistory().dailyCount'),1);
+  assert.equal(h.run('loadBossGreetingLedger()[job.encryptBossId].status'),'sent');
+  assert.equal((await h.run('applyBossJob(job,detail)')).skipped,true);
+  assert.equal(h.opened(),1);assert.equal(h.chat.clicks(),1);
+});
+
+test('额度提醒不能直接算成功，历史核验失败或收件人不符时零发送',async()=>{
+  for(const options of [{historyOK:false},{wrongBoss:true}]){
+    const h=quotaSetup(options);const result=await h.run('applyBossJob(job,detail)');
+    assert.equal(result.ok,false);assert.equal(result.needsAttention,true);
+    assert.equal(h.chat.clicks(),0);assert.equal(h.run('loadHistory().dailyCount'),0);
+  }
+});
+
+test('真正零额度、验证限制、未知提醒或剩余数不一致仍保持暂停',async()=>{
+  for(const options of [
+    {message:'今天已与150位BOSS沟通，还剩0次沟通机会哦',remainingQuota:0},
+    {message:quotaText+'，请完成安全验证'},
+    {message:quotaText+'，操作频繁'},
+    {message:'温馨提示，请补充资料；还剩30次沟通机会'},
+    {remainingQuota:29},
+  ]){
+    const h=quotaSetup(options);const result=await h.run('applyBossJob(job,detail)');
+    assert.equal(result.ok,false);assert.equal(result.needsAttention,true);
+    assert.equal(h.reads(),0);assert.equal(h.chat.clicks(),0);
+  }
+});
+
+test('原生额度提醒只确认平台返回的继续地址一次，核验后发送',async()=>{
+  const h=quotaSetup();let posts=0;
+  h.run('delete globalThis.openBossConversation');
+  // 恢复源码中的开聊函数，覆盖 quotaSetup 的测试替身。
+  const native=harness(['06-boss.js']);
+  h.context.fetch=async(url,options)=>{
+    posts++;assert.match(url,/friend\/add\.json/);assert.equal(options.method,'POST');
+    if(posts===2){assert.match(url,/cid=1/);return {ok:true,status:200,text:async()=>JSON.stringify({code:0})};}
+    return {ok:true,status:200,text:async()=>JSON.stringify({code:1,zpData:{bizData:{chatRemindDialog:{...quotaDialog(),title:'温馨提示',content:'您今天已与120位BOSS沟通，还剩30次沟通机会哦'}}}})};
+  };
+  h.run('globalThis.openBossConversation='+native.run('openBossConversation.toString()'));
+  const result=await h.run('applyBossJob(job,detail)');
+  assert.equal(result.ok,true);assert.equal(posts,2);assert.equal(h.reads(),1);assert.equal(h.chat.clicks(),1);
 });
 
 test('Vue 消息属性缺失时，完整正文加平台送达/已读回执才能确认', () => {
@@ -165,4 +308,43 @@ test('服务器已存消息但即时回执不更新时，只读核查后成功�
   assert.equal(reads,1);
   assert.equal(chat.clicks(),1);
   assert.equal(h.run('loadBossGreetingLedger()[job.encryptBossId].expectedText'),'专属招呼语');
+});
+
+
+test('额度提醒只接受当前岗位的原生确认按钮，拒绝外站、错岗位、未知按钮及重复参数',async()=>{
+  for(const change of [
+    d=>d.buttonList[0].webUrl='https://evil.example/wapi/zpgeek/friend/add.json?jobId=job-a&securityId=sec-a',
+    d=>d.buttonList[0].webUrl='/wapi/zpgeek/friend/add.json?jobId=other&securityId=sec-a',
+    d=>d.buttonList[0].webUrl+='&jobId=other',
+    d=>d.buttonList[0].webUrl='/wapi/unknown?jobId=job-a&securityId=sec-a',
+    d=>d.buttonList[0].text='购买机会',
+    d=>d.remindType=1024,
+  ]){
+    const h=quotaSetup();let confirms=0;h.context.fetch=async()=>{confirms++;throw Error('不应调用');};
+    change(h.context.contact.raw.zpData.bizData.chatRemindDialog);
+    const result=await h.run('applyBossJob(job,detail)');
+    assert.equal(result.needsAttention,true);assert.equal(confirms,0);assert.equal(h.chat.clicks(),0);
+  }
+});
+test('额度确认再次返回提醒或接口异常时只请求一次，不发送、不反复确认',async()=>{
+  for(const response of [{ok:false,status:503,data:{code:1}}, {ok:true,status:200,data:{code:1,message:quotaText}}]){
+    const h=quotaSetup();let confirms=0;h.context.fetch=async()=>{confirms++;return {...response,text:async()=>JSON.stringify(response.data)};};
+    const result=await h.run('applyBossJob(job,detail)');
+    assert.equal(result.needsAttention,true);assert.equal(confirms,1);assert.equal(h.chat.clicks(),0);
+    assert.equal((await h.run('applyBossJob(job,detail)')).skipped,true);assert.equal(confirms,1);
+  }
+});
+
+// 平台自动招呼可能在输入准备或 AI 等待期间到达，发送前必须再查一次。
+test('已有原生文字或发送前新到达的本人文字均不点击补发',async()=>{
+ for(const late of [false,true]){
+  const chat=chatDocument();let visible=!late;const original=chat.doc.querySelectorAll;
+  chat.doc.querySelectorAll=selector=>visible&&selector==='.message-item.item-myself'?[{__vue__:{message:{isSelf:true,text:'平台自动招呼',status:1}}}]:original(selector);
+  const h=setup({document:chat.document});
+  if(late)h.run('waitForBossOperation=async(kind)=>{if(kind==="send") revealNative()}');
+  h.context.revealNative=()=>{visible=true};
+  h.run('const review={status:"passed",reviewedText:"专属招呼语",checks:["typos","grammar","wording","facts","relevance"]}');
+  await assert.rejects(h.run('sendBossGreetingInChat(job,"专属招呼语",review)'),e=>e.code==='BOSS_GREETING_CONFLICT');
+  assert.equal(chat.clicks(),0);
+ }
 });

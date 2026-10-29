@@ -39,8 +39,30 @@
     return normalizeConfig(stored || {});
   }
 
+  function normalizeApplyLimit(value) {
+    const count = Number(value);
+    return Number.isInteger(count) && count >= 1 && count <= 150 ? count : DEFAULT_CONFIG.maxApplyCount;
+  }
+
+  // Arrays preserve each box as one keyword. Only legacy text is split.
+  function normalizeKeywordEntries(value) {
+    if (typeof value === "string" && value.trim().startsWith("[")) {
+      try { const parsed = JSON.parse(value); if (Array.isArray(parsed)) value = parsed; } catch (_) {}
+    }
+    const items = Array.isArray(value) ? value : String(value || "").split(/[，,\n;；、]/);
+    return [...new Set(items.filter(item => typeof item === "string").map(item => item.trim()).filter(Boolean))];
+  }
+  function normalizeCompanySizes(value) {
+    return normalizeKeywordEntries(value).filter(item => BOSS_COMPANY_SIZES.includes(item));
+  }
+
   function normalizeConfig(input) {
     const output = { ...DEFAULT_CONFIG, ...(input || {}) };
+    // 老用户继续原来的 AI/平台默认流程；首次安装通用版才默认固定话术。
+    if (!Object.prototype.hasOwnProperty.call(input || {}, "bossGreetingMode")) {
+      output.bossGreetingMode = PERSONAL_BUILD || Object.keys(input || {}).length ? "ai" : "fixed";
+    }
+    if (!["fixed", "ai"].includes(output.bossGreetingMode)) output.bossGreetingMode = DEFAULT_CONFIG.bossGreetingMode;
     // 兼容早期私人构建的发送模式；通用版尊重用户保存的预览选择。
     if (PERSONAL_BUILD && Number(input?.greetingWorkflowVersion || 0) < 2) output.bossGreetingPreviewOnly = false;
     output.greetingWorkflowVersion = 2;
@@ -50,7 +72,14 @@
     output.greetingIntroVersion = 1;
 
     // 强行锁死固定参数，忽略存储的旧数据
-    output.maxApplyCount = DEFAULT_CONFIG.maxApplyCount;
+    // Old installs used an effectively unlimited 9999; migrate to a modest
+    // default while preserving valid user-selected round limits.
+    output.maxApplyCount = normalizeApplyLimit(output.maxApplyCount);
+    output.includeDescriptionKeywords = normalizeKeywordEntries(output.includeDescriptionKeywords);
+    output.excludeDescriptionKeywords = normalizeKeywordEntries(output.excludeDescriptionKeywords);
+    output.bossCompanySizes = normalizeCompanySizes(output.bossCompanySizes);
+    // Timing is internal; discard old user-configurable interval values.
+    for (const key of ["bossReadIntervalSec", "bossContactIntervalSec", "bossSendIntervalSec"]) delete output[key];
     output.dailyLimit = DEFAULT_CONFIG.dailyLimit;
     output.delayMinSec = DEFAULT_CONFIG.delayMinSec;
     output.delayMaxSec = DEFAULT_CONFIG.delayMaxSec;
@@ -64,13 +93,23 @@
     output.skipHeadhunter = true;
     output.treatChatRemindAsSuccess = true;
 
-    for (const key of ["candidateIntro", "candidateExperience", "candidateProfile", "greetingAIEndpoint", "greetingAIModel", "greetingAllowedHttpOrigin"]) {
+    for (const key of ["candidateIntro", "candidateExperience", "candidateProfile", "candidateResumeText", "candidateBossResumeText", "candidateProfileBackup", "greetingAIEndpoint", "greetingAIModel", "greetingAllowedHttpOrigin", "bossFixedGreeting", "bossFixedGreetingConfirmedText"]) {
       output[key] = typeof output[key] === "string" ? output[key] : "";
     }
+    output.candidateResumeSource = output.candidateResumeSource === "boss" ? "boss" : "text";
+    // Removed platform greeting import: keep the saved text and its matching
+    // confirmation, but discard the obsolete source so old installs migrate.
+    delete output.bossFixedGreetingSource;
+    output.candidateProfileSource = ["text", "boss"].includes(output.candidateProfileSource) ? output.candidateProfileSource : "manual";
     for (const key of ["bossPersonalizedGreeting", "bossGreetingPreviewOnly", "bossGreetingUseAI", "bossGreetingIncludeAI"]) {
       output[key] = output[key] !== false;
     }
-    output.greetingOpening = ["您好", "你好"].includes(output.greetingOpening) ? output.greetingOpening : DEFAULT_CONFIG.greetingOpening;
+    output.autoRecoveryEnabled = output.autoRecoveryEnabled === true;
+    output.bossFixedGreetingConfirmed = output.bossFixedGreetingConfirmed === true &&
+      Boolean(output.bossFixedGreeting.trim()) && output.bossFixedGreetingConfirmedText === output.bossFixedGreeting;
+    if (!output.bossFixedGreetingConfirmed) output.bossFixedGreetingConfirmedText = "";
+    output.rememberGreetingKey = output.rememberGreetingKey === true;
+    output.greetingOpening = typeof output.greetingOpening === "string" ? output.greetingOpening.replace(/\s+/g, " ").trim().slice(0, 30) : "";
     const length = Number(output.bossGreetingMaxLength);
     output.bossGreetingMaxLength = Number.isFinite(length)
       ? Math.max(180, Math.min(500, Math.floor(length))) : 360;
@@ -90,7 +129,9 @@
   }
 
   function saveConfig(nextConfig, silent = false) {
+    const previous = config;
     config = normalizeConfig(nextConfig);
+    syncGreetingKeyStorage(previous);
     gmSet(CONFIG_KEY, config);
     if (!silent) {
       renderPanel();
@@ -124,7 +165,13 @@
   function recordApplied(job) {
     const history = loadHistory();
     const key = getJobUniqueKey(job);
-    if (!history.appliedKeys.includes(key)) history.appliedKeys.push(key);
+    if (!history.appliedKeys.includes(key)) {
+      history.appliedKeys.push(key);
+      // BOSS records a confirmed new contact before sending the greeting.
+      // Count that contact even if the later message fails; avoid double-counting
+      // when the runner records the same successful job again.
+      if (state.running) state.submitted = (Number(state.submitted) || 0) + 1;
+    }
     history.dailyCount = Math.max(
       Number(history.dailyCount) || 0,
       history.appliedKeys.length,
@@ -142,21 +189,29 @@
   // =====================================================================
 
   function saveResumeState(extra = {}) {
-    if (!state.running) return;
+    if (!state.running || state.stopping) return;
+    const snapshot = createRunSnapshot(extra);
+    if (snapshot) gmSet(RESUME_KEY, snapshot);
+  }
+
+  function createRunSnapshot(extra = {}) {
     const platformId = getPlatformId();
-    if (!platformId || platformId === "unknown") return;
-    gmSet(RESUME_KEY, {
+    if (!platformId || platformId === "unknown") return null;
+    return {
       platform: platformId,
       updatedAt: Date.now(),
       scanned: state.scanned,
       matched: state.matched,
       applied: state.applied,
+      submitted: state.submitted,
+      roundLimit: state.roundLimit || config.maxApplyCount,
       skipped: state.skipped,
       failed: state.failed,
+      previewed: state.previewed,
       current: state.current,
       processedKeys: Array.from(state.processedKeys),
       ...extra,
-    });
+    };
   }
 
   function clearResumeState() {

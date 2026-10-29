@@ -7,11 +7,13 @@ const APP_ID = "boss-auto-apply-custom"; // @build-identity
   const RESUME_KEY = `${APP_ID}:resume`;
   const PANEL_ID = `${APP_ID}-panel`;
   const STYLE_ID = `${APP_ID}-style`;
-  const VERSION = "0.6.1";
+  const VERSION = "0.9.19";
   // 私人构建时替换此对象；公开源码和普通构建不包含个人简历。
   const DEFAULT_CANDIDATE = { intro: "", profile: "" }; // @personal-profile
   const DEFAULT_AI_SERVICE = { endpoint: "", model: "", httpOrigin: "" }; // @personal-service
   const GREETING_LEDGER_KEY = `${APP_ID}:boss-greetings`;
+
+  const BOSS_COMPANY_SIZES = ["0-20人", "20-99人", "100-499人", "500-999人", "1000-9999人", "10000人以上"];
 
   const DEFAULT_CONFIG = {
     autoNextPage: true,
@@ -21,14 +23,15 @@ const APP_ID = "boss-auto-apply-custom"; // @build-identity
     skipHeadhunter: true,
     onlyOnlineBoss: false,
     treatChatRemindAsSuccess: true,
-    maxApplyCount: 9999,
+    maxApplyCount: 20,
     dailyLimit: 150,
     delayMinSec: 4,
     delayMaxSec: 10,
     pageDelaySec: 3,
     activeWithinDays: 14,
-    includeDescriptionKeywords: "",
-    excludeDescriptionKeywords: "",
+    includeDescriptionKeywords: [],
+    excludeDescriptionKeywords: [],
+    bossCompanySizes: [],
     shixisengResume: "",
     shixisengReportTime: "",
     shixisengInternshipTime: "",
@@ -37,16 +40,27 @@ const APP_ID = "boss-auto-apply-custom"; // @build-identity
     bossMaxDistanceKm: 10,
     bossHomeLocation: null,
     bossPersonalizedGreeting: true,
+    bossGreetingMode: PERSONAL_BUILD ? "ai" : "fixed",
+    bossFixedGreeting: "",
+    bossFixedGreetingConfirmed: false,
+    bossFixedGreetingConfirmedText: "",
     bossGreetingPreviewOnly: false,
     greetingWorkflowVersion: 2,
     candidateIntro: DEFAULT_CANDIDATE.intro,
     candidateExperience: DEFAULT_CANDIDATE.experience || "",
     greetingIntroVersion: 1,
     candidateProfile: DEFAULT_CANDIDATE.profile,
+    candidateResumeSource: "text",
+    candidateResumeText: "",
+    candidateBossResumeText: "",
+    candidateProfileBackup: "",
+    candidateProfileSource: "manual",
     bossGreetingMaxLength: 360,
     bossGreetingUseAI: !PERSONAL_BUILD,
     bossGreetingIncludeAI: PERSONAL_BUILD,
-    greetingOpening: "您好",
+    autoRecoveryEnabled: PERSONAL_BUILD,
+    rememberGreetingKey: false,
+    greetingOpening: "",
     greetingAIEndpoint: DEFAULT_AI_SERVICE.endpoint,
     greetingAIModel: DEFAULT_AI_SERVICE.model,
     greetingAllowedHttpOrigin: DEFAULT_AI_SERVICE.httpOrigin,
@@ -180,20 +194,29 @@ const APP_ID = "boss-auto-apply-custom"; // @build-identity
   ];
 
   const state = {
+    bossPacingMessage: "",
     running: false,
     stopping: false,
     collapsed: false,
     scanned: 0,
     matched: 0,
     applied: 0,
+    submitted: 0,
+    roundLimit: 0,
     skipped: 0,
     failed: 0,
     previewed: 0,
     lastGreeting: null,
+    greetingPreviewError: "",
+    greetingPreviewProgress: "",
+    resumeImport: { busy: false, draftText: "", source: "", message: "", revision: 0 },
+    versionUpdate: { checking: false, kind: "", releases: [], status: "", message: "" },
     platformRemainingQuota: null,
     current: "未开始",
     logs: [],
     processedKeys: new Set(),
+    recovering: false,
+    pendingResume: null,
   };
 
   // 智联岗位卡片对应的 Vue 数据缓存，避免每张卡片重复深度遍历。
@@ -201,5 +224,5 @@ const APP_ID = "boss-auto-apply-custom"; // @build-identity
 
   let config = loadConfig();
   let cachedPanel = null;
-  // 密钥只保留在本次页面会话，不写入配置或站点 localStorage。
+  // 默认仅保留于内存；用户可另行选择篡改猴专用存储，绝不写入配置或站点存储。
   let greetingAPIKey = "";

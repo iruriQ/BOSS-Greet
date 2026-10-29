@@ -7,9 +7,18 @@
     if (!saved) return false;
     const adapter = getAdapter();
     if (!adapter || !adapter.isListPage()) return false;
+    if (adapter.id === "boss" && (!config.autoRecoveryEnabled || needsGreetingKey(adapter))) {
+      if (config.autoRecoveryEnabled) deferRunForGreetingKey(saved);
+      else { state.pendingResume = saved; state.current = "已保留进度，请手动开始"; renderPanel(); }
+      return true;
+    }
+    state.pendingResume = saved;
 
     log("warn", "检测到上次任务在翻页时中断，正在自动继续…");
     window.setTimeout(() => {
+      if (state.pendingResume !== saved || (adapter.id === "boss" && !config.autoRecoveryEnabled)) return;
+      const blocked = adapter.id === "boss" && autoRecoveryBlockReason();
+      if (blocked) { state.pendingResume = null; state.current = blocked; log("warn", blocked); renderPanel(); return; }
       startApply({ resume: saved }).catch((error) => {
         state.running = false;
         state.stopping = false;
@@ -36,6 +45,11 @@
       });
       GM_registerMenuCommand(`${BUILD_SUFFIX ? "个人副本：" : ""}停止 ${label} 自动投递`, stopApply);
       GM_registerMenuCommand(`设置本次 API Key${BUILD_SUFFIX}`, setGreetingSessionKey);
+      GM_registerMenuCommand(`检查 BOSS Greet 更新${BUILD_SUFFIX}`, () => {
+        state.collapsed = false;
+        if (!cachedPanel) mountPanel();
+        void checkVersionUpdates(true);
+      });
     } catch (error) {
       console.warn(`[${APP_ID}] register menu failed`, error);
     }
@@ -77,6 +91,8 @@
     if (!adapter) return;
 
     if (attempt === 0) {
+      if (adapter.id === "boss") installBossPlatformGuard();
+      restoreGreetingKey();
       // 先安装菜单和路由监听：即使当前路径不认识，SPA 跳转到列表页后也能挂载面板。
       registerMenuCommands();
       installRouteWatcher();

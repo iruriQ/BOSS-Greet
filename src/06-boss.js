@@ -91,6 +91,7 @@
       brandIndustry: pickFirstString(raw, ["brandIndustry", "industryName"]),
       jobLabels: raw.jobLabels || raw.labels || raw.skills || [],
       skills: raw.skills || [],
+      publishedAt: getBossPublishedAt(raw),
       contact: Boolean(
         raw.contact ||
         raw.friendStatus === 1 ||
@@ -105,8 +106,7 @@
       job.goldHunter === 1 ||
       job.goldHunter === "1" ||
       /猎头/.test(job.rawText);
-    job.recruiterOnline =
-      job.bossOnline === true || /在线/.test(job.rawText);
+    job.recruiterOnline = getBossRecruiterOnline(job, null) === true;
 
     if (!job.jobName && !job.brandName && !job.securityId) return null;
     return job;
@@ -166,54 +166,153 @@
     return hasApplyFields || (hasJobText && Boolean(obj.securityId || obj.lid));
   }
 
+  function bossDetailReadError(stage, response, data, fallback = "") {
+    const message = normalizeText(data?.message || data?.msg || fallback).slice(0, 180);
+    const status = response?.status;
+    const code = data?.code;
+    const error = new Error(`${stage}${status ? ` HTTP ${status}` : ""}${code !== undefined ? `，code=${code}` : ""}${message ? `：${message}` : ""}`);
+    error.stopPreview = [401, 403, 429].includes(status) || [31, 32, 35, 36, 37, 5002, 5003, 5004].includes(Number(code)) || /登录|验证|频繁|访问受限|环境.*异常/.test(message);
+    return error;
+  }
+
+  async function requestBossJobDetail(path, params, stage) {
+    await waitForBossOperation("read");
+    let response;
+    try {
+      response = await fetch(`${path}?${params.toString()}`, {
+        method: "GET", credentials: "include", headers: buildBossDetailHeaders(),
+      });
+      assertBossPlatformReady();
+    } catch (error) {
+      if (error.stopPreview) throw error;
+      throw bossDetailReadError(stage, null, null, error.message || "网络请求失败");
+    }
+    let data;
+    try { data = JSON.parse(await response.text()); }
+    catch { throw bossDetailReadError(stage, response, null, "返回内容不是岗位 JSON 数据，可能是验证页或网络错误页"); }
+    if (!response.ok || (data?.code !== undefined && data.code !== 0)) {
+      const error = bossDetailReadError(stage, response, data);
+      if (error.stopPreview) throw stopForBossPlatform(error.message);
+      throw error;
+    }
+    const detail = data?.zpData?.jobCard || data?.zpData || data?.data;
+    if (!detail || typeof detail !== "object" || Array.isArray(detail))
+      throw bossDetailReadError(stage, response, data, "返回数据中缺少岗位详情");
+    return detail;
+  }
+
   async function fetchBossJobDetail(job) {
+    assertBossPlatformReady();
+    const pageView = getBossJobDetailView(job);
+    if (pageView) return readBossJobDetailFromPage(job, pageView);
     if (!job.securityId || !job.lid) {
       log("debug", `缺少详情字段，跳过详情请求：${formatJob(job)}`);
       return null;
     }
-
-    const params = new URLSearchParams({
-      lid: job.lid,
-      securityId: job.securityId,
-      sessionId: "",
-    });
-    const response = await fetch(
-      `/wapi/zpgeek/job/card.json?${params.toString()}`,
-      {
-        method: "GET",
-        credentials: "include",
-        headers: buildBossHeaders(),
-      },
-    );
-    const data = await parseResponse(response);
-
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    if (
-      data &&
-      typeof data === "object" &&
-      data.code !== undefined &&
-      data.code !== 0
-    ) {
-      throw new Error(data.message || `接口返回 code=${data.code}`);
-    }
-
-    const detail = data?.zpData?.jobCard || data?.zpData || data?.data || null;
-    if ((config.bossPersonalizedGreeting && !getGreetingJD(detail)) ||
+    const params = new URLSearchParams({ lid: job.lid, securityId: job.securityId, _: String(Date.now()) });
+    const detail = await requestBossJobDetail("/wapi/zpgeek/job/card.json", params, "岗位卡片接口");
+    if (((usesBossAIGreeting() || splitKeywords(config.includeDescriptionKeywords).length ||
+          splitKeywords(config.excludeDescriptionKeywords).length) && !getGreetingJD(detail)) ||
         (config.bossDistanceEnabled && !getBossWorkPoint(null, detail))) {
-      const fullResponse = await fetch(`/wapi/zpgeek/job/detail.json?${params.toString()}`, {
-        method: "GET", credentials: "include", headers: buildBossHeaders(),
-      });
-      const fullData = await parseResponse(fullResponse);
-      if (!fullResponse.ok || fullData?.code !== 0) throw new Error("岗位完整详情读取失败");
-      const full = fullData.zpData || {};
+      const full = await requestBossJobDetail("/wapi/zpgeek/job/detail.json", params, "岗位完整详情接口");
       return { ...detail, ...full, postDescription: getGreetingJD(full) };
     }
     return detail;
   }
 
+  async function diagnoseBossJobDetail() {
+    if (state.running || state.previewing || state.resumeImport.busy) return;
+    state.previewing = true; state.stopping = false;
+    renderPanel();
+    try {
+      beginManualBossAction();
+      const adapter = getAdapter();
+      const job = adapter?.id === "boss" && adapter.getCards().map((card, index) => adapter.buildJob(card, index)).find(Boolean);
+      if (!job) throw new Error("当前没有可检查的岗位");
+      const detail = await fetchBossJobDetail(job);
+      if (!detail) throw new Error("岗位卡片缺少读取所需字段");
+      const full = getBossJobDetailView(job) ? detail : await requestBossJobDetail("/wapi/zpgeek/job/detail.json", new URLSearchParams({lid:job.lid,securityId:job.securityId,_:String(Date.now())}), "岗位完整详情接口");
+      const online = getBossRecruiterOnline(job, full);
+      log("success", `岗位完整详情检查通过【${formatJob(job)}】：描述${getGreetingJD(full) ? "已读取" : "缺失"}，工作坐标${getBossWorkPoint(job, full) ? "已读取" : "缺失"}，招聘者${online === true ? "当前在线" : online === false ? "当前不在线" : "未提供在线状态"}；未调用 AI 或发送消息`);
+    } catch (error) { log("error", `岗位读取检查失败：${error.message || error}`); }
+    finally { state.previewing = false; state.stopping = false; renderPanel(); }
+  }
+
+  // Only explicit publication fields are accepted. Recruiter activity, refresh
+  // times, job IDs and arbitrary numbers must never be treated as publication.
+  function getBossPublishedAt(raw, now = Date.now()) {
+    for (const source of [raw?.jobInfo, raw]) {
+      for (const field of ["firstPublishTime", "jobPublishTime", "publishTime", "publishDate", "publishedAt", "releaseTime", "releaseDate"]) {
+        const value = source?.[field];
+        if (value === null || value === undefined || value === "") continue;
+        let timestamp = NaN;
+        if (typeof value === "number" || /^\d{10}(?:\d{3})?$/.test(String(value))) {
+          const n = Number(value); timestamp = n < 1e12 ? n * 1000 : n;
+        } else if (/^\d{4}[-/]\d{1,2}[-/]\d{1,2}(?:[T\s]|$)/.test(String(value))) {
+          timestamp = Date.parse(String(value));
+        }
+        if (Number.isFinite(timestamp) && timestamp >= 946684800000 && timestamp <= now + 60000) return timestamp;
+      }
+    }
+    return null;
+  }
+
+  function orderBossJobsByPublication(jobs) {
+    return jobs.map((job, index) => ({ job, index, time: getBossPublishedAt(job) ?? getBossPublishedAt(job.raw) }))
+      .sort((a, b) => (b.time ?? -Infinity) - (a.time ?? -Infinity) || a.index - b.index).map(item => item.job);
+  }
+
+  async function prepareBossLatestOrder() {
+    if (typeof document.querySelectorAll !== "function") return false;
+    // Use the platform's own "latest publication" sort when exposed, retaining
+    // the existing intent/search filters. Do not invent API sorting parameters.
+    const controls = [...document.querySelectorAll('button, a, [role="option"], [role="tab"]')]
+      .filter(node => !cachedPanel?.contains(node) && isElementVisible(node) && /^(最新发布|最新职位|按发布时间排序)$/.test(normalizeText(node.textContent)));
+    if (controls.length === 1) {
+      const control = controls[0];
+      const isSelected = node => node && (node.getAttribute('aria-selected') === 'true' || node.getAttribute('aria-pressed') === 'true' || /(^|\s)(active|selected|is-active)(\s|$)/.test(node.className));
+      if (!isSelected(control)) {
+        await waitForBossOperation("read");
+        control.click();
+        let confirmed = false;
+        for (let i = 0; i < 20 && !state.stopping; i++) {
+          await sleep(250);
+          const updated = [...document.querySelectorAll('button, a, [role="option"], [role="tab"]')]
+            .find(node => !cachedPanel?.contains(node) && /^(最新发布|最新职位|按发布时间排序)$/.test(normalizeText(node.textContent)) && isSelected(node));
+          if (updated) { confirmed = true; break; }
+        }
+        if (!confirmed) { log('warn', '未能确认平台最新发布排序已生效，将按可确认的时间处理已加载岗位'); return false; }
+      }
+      log('info', '已采用平台最新发布排序，保留当前岗位方向及筛选条件');
+      return true;
+    }
+    return false;
+  }
+
+  function getBossCompanySize(job, detail) {
+    const sources = [job, detail?.brandComInfo, detail?.brandInfo, detail?.companyInfo, detail?.jobInfo, detail];
+    for (const source of sources) {
+      for (const key of ["brandScaleName", "companyScaleName", "scaleName"]) {
+        const text = String(source?.[key] || "").replace(/\s/g, "").replace(/[—–~～至]/g, "-");
+        if (/^(?:少于20人|20人以下|0-20人)$/.test(text)) return "0-20人";
+        if (/^(?:10000人以上|10000\+人|10000人及以上)$/.test(text)) return "10000人以上";
+        if (BOSS_COMPANY_SIZES.includes(text)) return text;
+      }
+    }
+    return "";
+  }
+  function filterBossCompanySize(job, detail) {
+    const selected = normalizeCompanySizes(config.bossCompanySizes);
+    if (!selected.length) return { ok: true };
+    const size = getBossCompanySize(job, detail);
+    if (!size) return { ok: false, reason: "无法确认公司规模，已跳过" };
+    return selected.includes(size) ? { ok: true } : { ok: false, reason: `公司规模 ${size} 不在选中范围` };
+  }
+
   function bossShouldSkip(_job, detail) {
-    if (config.activeWithinDays > 0 && detail?.activeTimeDesc) {
-      const activeDays = parseActiveDays(detail.activeTimeDesc);
+    const activeDesc = detail?.bossInfo?.activeTimeDesc || detail?.jobCard?.bossInfo?.activeTimeDesc || detail?.activeTimeDesc;
+    if (config.activeWithinDays > 0 && activeDesc) {
+      const activeDays = parseActiveDays(activeDesc);
       if (Number.isFinite(activeDays) && activeDays > config.activeWithinDays) {
         return { skip: true, reason: "boss活跃度未达标,已过滤" };
       }
@@ -252,6 +351,7 @@
   }
 
   async function openBossConversation(job) {
+    await waitForBossOperation("contact");
     const params = new URLSearchParams({
       securityId: job.securityId,
       jobId: job.encryptJobId,
@@ -267,6 +367,10 @@
       },
     );
     const data = await parseResponse(response);
+    assertBossPlatformReady();
+    if ([31, 32, 35, 36, 37, 5002, 5003, 5004].includes(Number(data?.code)) || isLoginOrVerifyText(extractBossMessage(data))) {
+      throw stopForBossPlatform(`BOSS 暂停操作：${extractBossMessage(data) || `code=${data?.code}`}`);
+    }
     debugBossResponse(job, response, data);
 
     if (!response.ok) {
@@ -330,6 +434,79 @@
     };
     if (token) headers.Zp_token = token;
     return headers;
+  }
+
+  // Match the normal same-origin detail request. Never log or persist this
+  // transient page token, and do not synthesize platform challenge tokens.
+  function buildBossDetailHeaders() {
+    const headers = buildBossHeaders();
+    try {
+      const pageWindow = typeof unsafeWindow !== "undefined" ? unsafeWindow : window;
+      const token = pageWindow?._PAGE?.token;
+      if (typeof token === "string" && token.split("|")[0]) headers.token = token.split("|")[0];
+    } catch {}
+    return headers;
+  }
+
+  function getBossRecruiterOnline(job, detail) {
+    for (const source of [detail?.bossInfo, detail?.jobCard?.bossInfo, detail, detail?.jobCard, job?.raw?.bossInfo, job?.raw]) {
+      for (const key of ["bossOnline", "online", "isOnline"]) {
+        const value = source?.[key];
+        if (value === true || value === 1 || value === "1" || value === "true") return true;
+        if (value === false || value === 0 || value === "0" || value === "false") return false;
+      }
+    }
+    if (typeof job?.bossOnline === "boolean") return job.bossOnline;
+    if (job?.recruiterOnline === true) return true;
+    // Only the recruiter's dedicated marker counts; arbitrary job text and
+    // recent-activity descriptions must never imply current online presence.
+    if (job?.card?.querySelector?.(".boss-online-tag, .boss-online-icon")) return true;
+    return undefined;
+  }
+
+  function getBossJobDetailView(job) {
+    const seen = new Set();
+    for (let node = job?.card, depth = 0; node && depth < 16; node = node.parentElement, depth++) {
+      for (let view = node.__vue__, parent = 0; view && parent < 16 && !seen.has(view); view = view.$parent, parent++) {
+        seen.add(view);
+        if (view.currentJob && typeof view.jobDetail === "object" && "jobDetailLoading" in view) return view;
+      }
+    }
+    return null;
+  }
+
+  async function readBossJobDetailFromPage(job, view) {
+    assertBossPlatformReady();
+    const ready = () => {
+      const detail = view.jobDetail;
+      const id = detail?.jobInfo?.encryptId || detail?.jobInfo?.encryptJobId;
+      if (view.currentJob?.encryptJobId !== job.encryptJobId || view.jobDetailLoading ||
+          !detail?.jobInfo || (id && id !== job.encryptJobId)) return null;
+      return detail;
+    };
+    let detail = ready();
+    if (!detail) {
+      await waitForBossOperation("read");
+      // The normal job-card click lets BOSS load its own detail pane. Do not
+      // invoke internal request clients or manufacture security challenge data.
+      const target = job.card.matches?.(".job-card-box, .job-card-body") ? job.card
+        : job.card.querySelector?.(".job-card-box, .job-card-body") || job.card;
+      target.click();
+      for (let poll = 0; poll < 80; poll++) {
+        assertBossPlatformReady();
+        if (state.stopping) throw new Error("已停止读取岗位详情");
+        if (/\/safe-validate|\/captcha/.test(location.pathname || "")) break;
+        await sleep(250);
+        detail = ready();
+        if (detail) break;
+      }
+    }
+    if (!detail) {
+      const error = new Error("BOSS 网页未能加载当前岗位详情，已停止；请在网页查看是否需要登录或验证后手动重试");
+      error.stopPreview = true;
+      throw error;
+    }
+    return { ...detail, postDescription: getGreetingJD(detail) };
   }
 
   async function parseResponse(response) {

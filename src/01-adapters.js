@@ -6,7 +6,7 @@
     boss: {
       id: "boss",
       label: "Boss 直聘",
-      onlineLabel: "仅在线 BOSS",
+      onlineLabel: "只投递招聘方显示在线的岗位",
       exampleUrl: "https://www.zhipin.com/web/geek/job",
       isListPage: isBossJobPage,
       ensureLogin: ensureBossLogin,

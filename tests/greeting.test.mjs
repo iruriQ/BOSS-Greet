@@ -37,15 +37,15 @@ test('JD 中的指令、额外数字和能力不进入候选人经历', async ()
   assert.doesNotMatch(result.text, /10年|Python|SQL|999|忽略/);
   assert.equal(h.run('greetingKeywordHits("无需Excel，不要求SQL", ["Excel", "SQL"])'), 0);
 });
-test('AI 只返回事实编号；擅自编造的文本永远不会进入最终话术', async () => {
+test('AI 一次完成选择与生成，只接受有原始依据的正文与经历编号', async () => {
   let request;
   const h = setup({ GM_xmlhttpRequest: (options) => {
     request = options;
-    options.onload({ status: 200, responseText: JSON.stringify({ choices: [{ message: { content: JSON.stringify({ evidenceIds: ['E2'], style: 'direct', inventedText: '我精通Python并有10年经验' }) } }] }) });
+    options.onload({ status: 200, responseText: JSON.stringify({ choices: [{ message: { content: JSON.stringify({ evidenceIds: ['E2'], text: '您好，使用Excel整理门店数据，制作库存统计报表和数据台账。期待与您沟通。', inventedText: '我精通Python并有10年经验' }) } }] }) });
   } });
   h.run('config.bossGreetingUseAI = true; config.greetingAIEndpoint = "https://model.example/v1/chat/completions"; config.greetingAIModel = "test-model"; greetingAPIKey = "private-test-key";');
   const result = await h.run('createBossGreeting(job, {postDescription:"数据核验与Excel"})');
-  assert.equal(result.source, 'AI 语义匹配');
+  assert.equal(result.source, 'AI 定制生成');
   assert.equal(result.evidenceIds[0], 'E2');
   assert.doesNotMatch(result.text, /Python|10年/);
   assert.equal(request.headers.Authorization, 'Bearer private-test-key');
@@ -66,7 +66,7 @@ test('AI 失败、超时或无效编号时不静默发送兜底消息', async ()
     await assert.rejects(h.run('createBossGreeting(job, {postDescription:"合同管理"})'), /无效|超时|HTTP 401/);
   }
 });
-test('拒绝不安全接口；超长经历保持原句，不从中截出错误事实', async () => {
+test('拒绝不安全接口；无服务时不机械截断超长经历或编造事实', async () => {
   const h = setup();
   for (const url of ['http://remote.example/api', 'https://key:secret@example.com/api', 'https://example.com/api?key=secret', 'https://www.zhipin.com/api']) {
     h.context.url = url;
@@ -74,7 +74,7 @@ test('拒绝不安全接口；超长经历保持原句，不从中截出错误�
   }
   assert.equal(h.run('validateGreetingAIEndpoint("http://localhost:8080/chat/completions")'), 'http://localhost:8080/chat/completions');
   h.run('config.bossGreetingMaxLength = 180; config.candidateProfile = "合同核对".repeat(100);');
-  await assert.rejects(h.run('createBossGreeting(job, {postDescription:"合同管理"})'), /过长/);
+  await assert.rejects(h.run('createBossGreeting(job, {postDescription:"合同管理"})'), /配置 AI 服务/);
 });
 
 test('各种开场风格都保留您好和五年以上工作经验，简介为空也不遗漏', () => {
@@ -129,7 +129,7 @@ test('关闭额外AI亮点后，模型仍可按岗位相关性选择真实AI经�
   let body;
   const h=setup({GM_xmlhttpRequest:options=>{
     body=JSON.parse(options.data);
-    options.onload({status:200,responseText:JSON.stringify({choices:[{message:{content:'{"evidenceIds":["E5"],"style":"interest"}'}}]})});
+    options.onload({status:200,responseText:JSON.stringify({choices:[{message:{content:'{"evidenceIds":["E5"],"text":"您好，在模拟项目中实践AI资料分类，将月均重复整理耗时由约17小时降至约6小时。期待与您沟通。"}'}}]})});
   }});
   h.run('config.bossGreetingUseAI=true;config.bossGreetingIncludeAI=false;config.greetingAIEndpoint="https://model.example/chat/completions";config.greetingAIModel="example-model"');
   const result=await h.run('createBossGreeting(job,{postDescription:"AI资料分类"})');
@@ -137,15 +137,15 @@ test('关闭额外AI亮点后，模型仍可按岗位相关性选择真实AI经�
   assert.equal(JSON.parse(body.messages[1].content).candidateFacts.length,5);
 });
 
-test('所选开场问候与工作年限独立配置，并进入校对约束', async () => {
+test('填写的开场问候与工作年限独立配置，并进入校对约束', async () => {
   const h=setup();
   h.run('config.greetingOpening="你好";config.candidateExperience="五年工作经验"');
   const result=await h.run('createBossGreeting(job,{postDescription:"合同归档"})');
   assert.match(result.text,/^你好，/);
   assert.match(result.text,/五年工作经验/);
   h.context.text=result.text.replace(/^你好/,'您好');
-  assert.match(h.run('lintGreetingText(text,config).join()'),/所选开场问候/);
-  assert.equal(h.run('normalizeConfig({greetingOpening:"无效"}).greetingOpening'),'您好');
+  assert.match(h.run('lintGreetingText(text,config).join()'),/填写的开场问候/);
+  assert.equal(h.run('normalizeConfig({greetingOpening:" 您好呀 "}).greetingOpening'),'您好呀');
 });
 
 test('通用版默认AI匹配时，未填服务仍可只预览本地草稿，实际发送不能绕过服务配置', async () => {
@@ -155,4 +155,19 @@ test('通用版默认AI匹配时，未填服务仍可只预览本地草稿，实
   assert.equal(result.proofread.status,'unreviewed');
   h.run('config.bossGreetingPreviewOnly=false');
   await assert.rejects(h.run('prepareBossGreeting(job,{postDescription:"合同归档"},config)'),/AI 接口 URL/);
+});
+
+ test('开场问候支持自由文本；留空和空白默认您好，末尾标点不重复', async () => {
+  const h=setup();
+  for(const [value,expected] of [['','您好'],['  ','您好'],['招聘老师您好','招聘老师您好'],['您好呀！','您好呀']]) {
+    h.context.opening=value;
+    h.run('config.greetingOpening=opening');
+    const result=await h.run('createBossGreeting(job,{postDescription:"合同归档"})');
+    assert.ok(result.text.startsWith(expected+'，'));
+    h.context.sample=result.text;
+    assert.equal(h.run('lintGreetingText(sample,config).length'),0);
+  }
+  assert.equal(h.run('normalizeConfig({}).greetingOpening'),'');
+  h.run('saveConfig({...config,greetingOpening:"招聘老师您好"},true)');
+  assert.equal(h.run('loadConfig().greetingOpening'),'招聘老师您好');
 });

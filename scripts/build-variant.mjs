@@ -10,6 +10,8 @@ export function applyBuildVariant(header, config, profile = null) {
   };
   header = replaceRequired(header, "// @name         BOSS 岗位定制招呼助手\n", "// @name         BOSS 岗位定制招呼助手（个人副本）\n");
   header = replaceRequired(header, "local.boss-auto-apply.custom", "local.boss-auto-apply.personal-copy");
+  // 既有个人副本只在 BOSS、猎聘、智联运行，修复更新不追加其他网站范围。
+  header = header.replace(/^\/\/ @match\s+https:\/\/(?:we\.51job\.com\/pc\/search\*|(?:www|resume)\.shixiseng\.com\/interns\*)\n/gm, "");
   config = replaceRequired(config, 'const APP_ID = "boss-auto-apply-custom"; // @build-identity', 'const APP_ID = "boss-auto-apply-personal-copy"; // @build-identity');
   config = replaceRequired(config, "const PERSONAL_BUILD = false; // @build-variant", "const PERSONAL_BUILD = true; // @build-variant");
   config = replaceRequired(config,

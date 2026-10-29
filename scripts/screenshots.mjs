@@ -12,7 +12,7 @@ const output=resolve(root,'images');
 await mkdir(output,{recursive:true});
 const job={jobName:'数据运营专员',brandName:'示例数科',salaryDesc:'8-12K',encryptJobId:'demo-job',encryptBossId:'demo-boss',securityId:'demo-security',lid:'demo-list',activeTimeDesc:'今日活跃'};
 const description='使用Excel和SQL整理、清洗业务数据，维护统计口径；制作经营分析报表，保证数据准确、更新及时；与业务团队核对异常数据，跟进问题处理进度。有数据整理、业务支持或相关工作经验，熟悉Excel与SQL，有良好的沟通与协作习惯。';
-const profile={candidateIntro:'我主要从事数据整理与业务支持工作。',candidateExperience:'三年工作经验',candidateProfile:[
+const profile={bossGreetingMode:'ai',candidateIntro:'我主要从事数据整理与业务支持工作。',candidateExperience:'三年工作经验',candidateProfile:[
   '使用Excel与SQL清洗业务数据，制作经营分析报表。',
   '与业务团队核对数据口径，跟进异常问题的处理进度。',
   '使用AI辅助资料分类与文档初稿整理，并人工核对输出。',
@@ -20,7 +20,8 @@ const profile={candidateIntro:'我主要从事数据整理与业务支持工作�
 const browser=await puppeteer.launch({executablePath:process.env.CHROME_PATH||'/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',headless:true});
 try {
   const page=await browser.newPage();
-  await page.setViewport({width:1440,height:1180,deviceScaleFactor:2});
+  await page.setViewport({width:1440,height:1100,deviceScaleFactor:2});
+  await page.emulateMediaFeatures([{name:"prefers-reduced-motion",value:"reduce"}]);
   const errors=[],requests=[];
   page.on('pageerror',error=>errors.push(error.message));
   await page.setRequestInterception(true);
@@ -36,52 +37,48 @@ try {
     const card=document.querySelector('.job-card-wrapper');card.__vue__={data:job};
     card.parentElement.__vue__={jobList:[job],hasMore:false,moreLoading:false,loading:false,pageVo:{page:1}};
     const stored=new Map();
-    window.GM_getValue=(key,fallback)=>stored.get(key)??(key.endsWith(':config')?profile:fallback);
+    window.GM_getValue=(key,fallback)=>stored.get(key)??(key.endsWith(':config')?profile:key.endsWith(':ui')?{expanded:true}:fallback);
     window.GM_setValue=(key,value)=>stored.set(key,value);
     window.GM_notification=()=>{};
     window.prompt=()=> 'DEMO_ONLY_NOT_A_REAL_KEY';
     window.__demoAIRequests=[];
     window.GM_xmlhttpRequest=options=>{
+      if(!options.data) { options.onerror(); return; } // GitHub update checks stay offline.
       const body=JSON.parse(options.data);window.__demoAIRequests.push(body);
-      const isSelection=!body.messages[0].content.includes('校对员');
-      const content=isSelection?{evidenceIds:['E1','E2'],style:'interest'}:{verdict:'pass',checks:{typos:true,grammar:true,wording:true,facts:true,relevance:true},issues:[],edits:[]};
+      const isGeneration=body.messages[0].content.includes('一次完成挑选真实经历和撰写');
+      const content=isGeneration?{text:'您好，我有三年工作经验。使用Excel与SQL清洗业务数据，制作经营分析报表。与业务团队核对数据口径，跟进异常问题的处理进度。期待与您沟通。',evidenceIds:['E1','E2']}:{verdict:'pass',majorErrors:[],suggestions:[]};
       options.onload({status:200,responseText:JSON.stringify({choices:[{message:{content:JSON.stringify(content)}}]})});
     };
   },{job,profile});
   await page.addScriptTag({content:source});
   await page.waitForSelector('[name="candidateProfile"]');
-  await page.evaluate(()=>{
-    const distance=document.querySelector('[name="bossMaxDistanceKm"]').closest('details');distance.open=false;
-    const service=document.querySelector('[name="greetingAIEndpoint"]').closest('details');service.open=true;
-  });
+  await page.$eval('[name="greetingAIEndpoint"]',el=>{el.closest('details').open=true;});
   await page.click('[data-action="set-greeting-key"]');
-  // renderPanel 重绘后，通过原生 disclosure 状态展示配置，面板样式不作修改。
-  await page.evaluate(()=>{
-    document.querySelector('[name="bossMaxDistanceKm"]').closest('details').open=false;
-    document.querySelector('[name="greetingAIEndpoint"]').closest('details').open=true;
-    const section=document.querySelector('[name="candidateProfile"]').closest('details');
-    const body=document.querySelector('.aj-body');body.scrollTop+=section.getBoundingClientRect().top-body.getBoundingClientRect().top;
-  });
-  await page.screenshot({path:resolve(output,'demo-configuration.png')});
-  await page.click('[data-action="start"]');
-  await page.waitForFunction(()=>document.querySelector('.aj-logs')?.textContent.includes('任务结束：扫描 1'),{timeout:30000});
+  await page.click('[data-action="preview-greeting"]');
+  await page.waitForFunction(()=>document.querySelector('.aj-preview-box')?.textContent.includes('重大事实核验通过'),{timeout:10000});
   assert.match(await page.$eval('.aj-preview',el=>el.textContent),/^您好，.*三年工作经验.*Excel与SQL/);
   assert.doesNotMatch(await page.$eval('.aj-preview',el=>el.textContent), /采购跟进/);
-  assert.match(await page.$eval('.aj-preview-box',el=>el.textContent),/AI 语义匹配.*校对通过/s);
-  assert.match(await page.$eval('.aj-logs',el=>el.textContent),/预览 1，成功 0/);
+  assert.match(await page.$eval('.aj-preview-box',el=>el.textContent),/AI 定制生成.*重大事实核验通过/s);
   assert.equal(requests.some(path=>/friend\/add|chat|message-accepted/.test(path)),false);
   assert.equal(await page.evaluate(()=>window.__demoAIRequests.length),2);
-  await page.evaluate(()=>{
-    document.querySelector('#stage-kicker').textContent='02 / 按岗匹配与校对';
-    document.querySelector('#stage-title').textContent='同一份经历，回应当前岗位的具体需求';
-    document.querySelector('#stage-subtitle').textContent='读取 Excel、SQL 与报表要求，选择相关经历，保留问候和真实年限。';
-    document.querySelector('#stage-label').textContent='话术预览 · 仅预览，未发送';
-    document.querySelector('#stage-note').innerHTML='<strong>预览结果由当前项目的生成与校对流程输出</strong>本演示使用模拟模型回复来复现流程，不代表真实 AI 服务的校对能力；未连接真实账号、未发送消息。';
-    document.querySelector('[name="bossMaxDistanceKm"]').closest('details').open=false;
-    document.querySelector('[name="candidateProfile"]').closest('details').open=false;
-    document.querySelector('.aj-body').scrollTop=0;
+  await page.evaluate(()=>{const content=document.querySelector('.nova-content'),preview=document.querySelector('[data-card="preview"]');content.scrollTop+=preview.getBoundingClientRect().top-content.getBoundingClientRect().top-12;});
+  await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+  await (await page.$('[data-boss-nova]')).screenshot({path:resolve(output,'demo-greeting-preview.png')});
+  // Default fixed mode uses the real confirmation/preview flow and calls no model.
+  await page.select('[name="bossGreetingMode"]','fixed');
+  await page.waitForSelector('[name="bossFixedGreeting"]');
+  await page.$eval('[name="bossFixedGreeting"]',el=>{
+    el.value='您好！我对贵公司的招聘岗位很感兴趣，希望进一步了解工作内容与任职要求，期待与您沟通。';
+    el.dispatchEvent(new Event('input',{bubbles:true}));
   });
-  await page.screenshot({path:resolve(output,'demo-greeting-preview.png')});
+  await page.click('[name="bossFixedGreetingConfirmed"]');
+  await page.click('[data-action="preview-greeting"]');
+  await page.waitForFunction(()=>document.querySelector('.aj-preview-box')?.textContent.includes('用户已确认原文'));
+  assert.equal(await page.evaluate(()=>window.__demoAIRequests.length),2);
+  await page.click('[data-nav="greeting"]');
+  await (await page.$('[data-boss-nova]')).screenshot({path:resolve(output,'demo-configuration.png')});
+  await page.click('[data-nav="filters"]');
+  await (await page.$('[data-boss-nova]')).screenshot({path:resolve(output,'demo-nova-workbench.png')});
   assert.deepEqual(errors,[]);
-  console.log('已生成两张演示截图：images/demo-configuration.png、images/demo-greeting-preview.png。真实面板与生成流程，虚构岗位和经历，模拟AI回复；全部请求均被拦截，零真实发送。');
+  console.log('已生成三张演示截图：工作台、固定话术配置、AI 话术预览。真实面板与生成流程，虚构岗位和经历，模拟AI回复；全部请求均被拦截，零真实发送。');
 } finally { await browser.close(); }

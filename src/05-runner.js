@@ -20,6 +20,8 @@
     state.scanned = 0;
     state.matched = 0;
     state.applied = 0;
+    state.submitted = 0;
+    state.roundLimit = config.maxApplyCount;
     state.skipped = 0;
     state.failed = 0;
     state.previewed = 0;
@@ -29,8 +31,18 @@
   }
 
   async function startApply(options = {}) {
-    if (state.running) return;
+    if (state.running || state.resumeImport.busy) return;
+    if (!Number.isInteger(config.maxApplyCount) || config.maxApplyCount < 1 || config.maxApplyCount > 150) {
+      log("warn", "本轮投递数量请填写 1 至 150 的整数");
+      return;
+    }
     const adapter = getAdapter();
+    if (adapter?.id === "boss") {
+      try {
+        if (options.resume) assertBossPlatformReady();
+        else beginManualBossAction();
+      } catch (error) { log("warn", error.message); renderPanel(); return; }
+    }
     if (state.previewing) return;
     if (!adapter || !adapter.isListPage()) {
       log(
@@ -57,11 +69,17 @@
         return;
       }
     }
-    if (adapter.id === "boss" && config.bossPersonalizedGreeting && !getGreetingFacts().length) {
+    if (adapter.id === "boss" && config.bossPersonalizedGreeting && config.bossGreetingMode === "fixed") {
+      try { validateFixedBossGreeting(config, !config.bossGreetingPreviewOnly); } catch (error) {
+        log("error", error.message);
+        return;
+      }
+    }
+    if (adapter.id === "boss" && usesBossAIGreeting() && !getGreetingFacts().length) {
       log("error", "请先填写我的简介与真实经历，再生成岗位招呼语");
       return;
     }
-    if (adapter.id === "boss" && config.bossPersonalizedGreeting && !config.bossGreetingPreviewOnly) {
+    if (adapter.id === "boss" && usesBossAIGreeting() && !config.bossGreetingPreviewOnly) {
       try { validateGreetingReviewConfig(config); } catch (error) {
         log("error", `尚不能自动发送：${error.message || error}。配置后即可按“生成→校对→发送”自动处理。`);
         return;
@@ -74,7 +92,15 @@
       return;
     }
 
-    const resume = options.resume || null;
+    const resume = options.resume || state.pendingResume || null;
+    if (needsGreetingKey(adapter)) {
+      if (!resume) resetRunCounters();
+      if (config.autoRecoveryEnabled) deferRunForGreetingKey(resume || createRunSnapshot());
+      else { state.current = "请先设置 AI 密钥，再开始"; log("warn", state.current); renderPanel(); }
+      return;
+    }
+    state.pendingResume = null;
+    clearResumeState();
     state.running = true;
     state.stopping = false;
 
@@ -82,8 +108,12 @@
       state.scanned = Number(resume.scanned) || 0;
       state.matched = Number(resume.matched) || 0;
       state.applied = Number(resume.applied) || 0;
+      state.submitted = Math.max(state.applied, Number.isInteger(resume.submitted) ? resume.submitted : 0);
+      state.roundLimit = Math.min(config.maxApplyCount, resume.roundLimit == null
+        ? config.maxApplyCount : normalizeApplyLimit(resume.roundLimit));
       state.skipped = Number(resume.skipped) || 0;
       state.failed = Number(resume.failed) || 0;
+      state.previewed = Number(resume.previewed) || 0;
       state.platformRemainingQuota = null;
       state.processedKeys = new Set(
         Array.isArray(resume.processedKeys) ? resume.processedKeys : [],
@@ -112,34 +142,72 @@
       state.running = false;
       state.stopping = false;
       state.current = state.current || "已结束";
-      clearResumeState();
-      log(
-        "success",
-        `任务结束：扫描 ${state.scanned}，匹配 ${state.matched}，预览 ${state.previewed}，成功 ${state.applied}，跳过 ${state.skipped}，失败 ${state.failed}`,
-      );
-      notify(
-        `${adapter.label} 自动投递助手`,
-        `任务结束：成功 ${state.applied} 条`,
-      );
+      if (state.pendingResume && config.autoRecoveryEnabled) {
+        gmSet(RESUME_KEY, { ...state.pendingResume, phase: "awaiting-key", updatedAt: Date.now() });
+        log("warn", "任务已暂停，等待更新 AI 密钥；设置后自动继续，投递记录已保留");
+      } else {
+        clearResumeState();
+        log(
+          "success",
+          `任务结束：扫描 ${state.scanned}，匹配 ${state.matched}，预览 ${state.previewed}，成功 ${state.applied}，跳过 ${state.skipped}，失败 ${state.failed}`,
+        );
+        notify(`${adapter.label} 自动投递助手`, `任务结束：成功 ${state.applied} 条`);
+      }
       renderPanel();
     }
   }
 
   function stopApply() {
-    if (!state.running) return;
-    state.stopping = true;
-    state.current = "正在停止，等待当前请求结束";
+    if (state.previewing && !state.running) {
+      state.stopping = true;
+      state.greetingPreviewProgress = "正在停止筛选预览，等待当前请求结束";
+      renderPanel();
+      return;
+    }
+    if (!state.running && !state.pendingResume) return;
+    state.pendingResume = null;
+    clearResumeState();
+    state.stopping = state.running;
+    state.current = state.running ? "正在停止，等待当前请求结束" : "已手动停止";
     log("warn", "已请求停止");
     renderPanel();
   }
 
+  function roundUsedCount(adapter) {
+    return isGreetingPreviewRun(adapter) ? state.previewed : Math.max(state.applied, state.submitted);
+  }
+
+  function stopAtRoundLimit(adapter) {
+    const limit = state.roundLimit || config.maxApplyCount;
+    if (roundUsedCount(adapter) < limit) return false;
+    state.current = isGreetingPreviewRun(adapter)
+      ? `本轮已预览 ${state.previewed} 个，达到设定数量 ${limit} 个，已停止；未实际投递`
+      : `本轮已使用 ${roundUsedCount(adapter)} 个投递名额，达到设定数量 ${limit} 个，已停止`;
+    log("info", state.current);
+    return true;
+  }
+
   async function runApplyLoop(adapter, applySession) {
     let pageRound = 1;
+    const platformLatestOrder = adapter.id === "boss" && typeof prepareBossLatestOrder === "function"
+      ? await prepareBossLatestOrder() : false;
+    let reportedPublicationOrder = false;
 
     while (!state.stopping) {
+      if (stopAtRoundLimit(adapter)) return;
       state.current = `读取第 ${pageRound} 页职位`;
       renderPanel();
-      const jobs = await collectJobsWithWait(adapter);
+      let jobs = await collectJobsWithWait(adapter);
+      if (adapter.id === "boss" && typeof orderBossJobsByPublication === "function") {
+        const known = jobs.filter(job => getBossPublishedAt(job) !== null || getBossPublishedAt(job.raw) !== null).length;
+        jobs = orderBossJobsByPublication(jobs);
+        if (jobs.length && !reportedPublicationOrder && !platformLatestOrder) {
+          log(known ? "info" : "warn", known
+            ? `已加载岗位中 ${known} 个可确认发布时间，按新到旧处理；其他岗位保留平台顺序。未提供全列表时间，不能保证跨页排序。`
+            : "平台当前列表未提供可确认的岗位发布时间或最新排序入口，沿用平台顺序；不会用招聘方活跃时间代替发布时间。");
+          reportedPublicationOrder = true;
+        }
+      }
       if (jobs.length === 0) {
         if (adapter.getCards().length === 0) {
           log("warn", "当前页未找到可读取的职位卡片。");
@@ -150,10 +218,7 @@
 
       for (const job of jobs) {
         if (state.stopping) break;
-        if (state.applied >= config.maxApplyCount) {
-          state.current = "达到单次上限";
-          return;
-        }
+        if (stopAtRoundLimit(adapter)) return;
 
         const history = loadHistory();
         if (!isGreetingPreviewRun(adapter) && history.dailyCount >= getDailyLimit(adapter)) {
@@ -167,17 +232,14 @@
       }
 
       if (state.stopping) break;
-      if (state.applied >= config.maxApplyCount) {
-        state.current = "达到单次上限";
-        return;
-      }
+      if (stopAtRoundLimit(adapter)) return;
       if (!config.autoNextPage) {
         state.current = "当前页处理完成（未开启自动翻页）";
         return;
       }
 
       state.paginationStopReason = "";
-      const moved = await adapter.nextPage();
+      const moved = await nextPageWithAutoRecovery(adapter);
       if (!moved) {
         if (state.stopping) {
           if (state.current === "正在停止，等待当前请求结束") state.current = "已手动停止";
@@ -233,11 +295,15 @@
     state.current = formatJob(job);
     renderPanel();
 
+    let startedJob = false;
     try {
-      // BOSS 专属话术始终读取 JD；其他平台沿用仅在关键词筛选时读取的策略。
+      if (adapter.id === "boss") await waitForBossJobGap();
+      if (state.stopping) return;
+      startedJob = true;
+      // BOSS 保留活跃度、已沟通和距离等详情筛选；固定话术不要求 JD 或 AI 服务。
       const needJobDetail =
         config.fetchDetail &&
-        ((adapter.id === "boss" && (config.bossPersonalizedGreeting || config.bossDistanceEnabled)) ||
+        ((adapter.id === "boss") ||
           splitKeywords(config.includeDescriptionKeywords).length > 0 ||
           splitKeywords(config.excludeDescriptionKeywords).length > 0);
       const detail = needJobDetail
@@ -257,7 +323,19 @@
       state.matched += 1;
 
       if (state.stopping) return;
-      const result = await adapter.apply(job, adapter.id === "boss" ? detail : applySession);
+      const result = await applyWithAutoRecovery(job, detail, adapter, applySession);
+      if (state.stopping && !result.ok) return;
+      if (adapter.id === "boss" && config.autoRecoveryEnabled && result.recoveryKind === "credentials") {
+        // 鉴权失败发生在开聊前；保留本岗位用于更新密钥后的续跑。
+        state.processedKeys.delete(key);
+        state.scanned -= 1;
+        state.matched -= 1;
+        greetingAPIKey = "";
+        storeGreetingKey();
+        deferRunForGreetingKey(createRunSnapshot());
+        state.stopping = true;
+        return;
+      }
       if (result.preview) {
         state.previewed += 1;
       } else if (result.ok) {
@@ -283,15 +361,20 @@
         ) {
           log("warn", `平台沟通机会仅剩 ${result.remainingQuota} 次`);
         }
+      } else if (result.pendingReview) {
+        log("warn", `待检查【${formatJob(job)}】：${result.message}`);
+        return;
       } else if (result.skipped) {
         state.skipped += 1;
         log(
           "warn",
           `跳过【${formatJob(job)}】：${result.message || "无需重复投递"}`,
         );
-        await sleep(randomBetween(500, 1200));
+        if (adapter.id !== "boss") await sleep(randomBetween(500, 1200));
         return;
       } else if (result.limited || result.needsAttention) {
+        // No conversation was opened: keep this job eligible for a manual retry.
+        if (result.retryableJob) state.processedKeys.delete(key);
         state.failed += 1;
         log(
           "error",
@@ -305,16 +388,24 @@
         log("error", `投递失败【${formatJob(job)}】：${result.message}`);
       }
 
-      await sleepHumanDelay();
+      if (adapter.id !== "boss") await sleepHumanDelay();
     } catch (error) {
+      if (state.stopping) return;
       state.failed += 1;
+      if (adapter.id === "boss" && error.stopPreview) {
+        state.stopping = true;
+        state.current = "BOSS 岗位读取受限，请在网页检查后手动重试";
+        log("error", `${state.current}：${error.message || error}`);
+        return;
+      }
       log(
         "error",
         `处理失败【${formatJob(job)}】：${error.message || error}`,
         error,
       );
-      await sleepHumanDelay();
+      if (adapter.id !== "boss") await sleepHumanDelay();
     } finally {
+      if (adapter.id === "boss" && startedJob) markBossJobFinished();
       renderPanel();
     }
   }
@@ -323,9 +414,10 @@
     try {
       return await adapter.fetchDetail(job);
     } catch (error) {
+      if (adapter.id === "boss" && error.stopPreview) throw error;
       log(
         "warn",
-        `获取详情失败，继续使用基础信息过滤【${formatJob(job)}】：${error.message || error}`,
+        `获取详情失败，将跳过无法确认的筛选条件【${formatJob(job)}】：${error.message || error}`,
       );
       return null;
     }
@@ -347,12 +439,15 @@
     }
 
     if (config.onlyOnlineBoss && adapter.supportsOnlineFilter) {
-      if (!job.recruiterOnline) {
-        return { ok: false, reason: "无法确认招聘者在线" };
+      const online = adapter.id === "boss" ? getBossRecruiterOnline(job, detail) : job.recruiterOnline;
+      if (online !== true) {
+        return { ok: false, reason: online === false ? "招聘者当前不在线" : "平台未提供可确认的招聘者在线状态" };
       }
     }
 
     if (adapter.id === "boss") {
+      const scale = filterBossCompanySize(job, detail);
+      if (!scale.ok) return scale;
       const distance = filterBossHomeDistance(job, detail);
       if (!distance.ok) return distance;
     }
@@ -365,10 +460,12 @@
     const includeDesc = splitKeywords(config.includeDescriptionKeywords);
     const excludeDesc = splitKeywords(config.excludeDescriptionKeywords);
     if (includeDesc.length || excludeDesc.length) {
+      if (adapter.id === "boss" && !getGreetingJD(detail))
+        return { ok: false, reason: "无法读取完整岗位详情，不能确认关键词条件" };
       const text = fuzzyText(job, detail);
       if (!textHasInclude(text, includeDesc))
         return { ok: false, reason: "岗位详情不包含指定关键词" };
-      if (excludeDesc.length && textHasAny(text, excludeDesc))
+      if (!includeDesc.length && excludeDesc.length && textHasAny(text, excludeDesc))
         return { ok: false, reason: "岗位详情命中排除关键词" };
     }
 

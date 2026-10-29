@@ -1,6 +1,6 @@
 {
   "name": "boss-auto-apply-userscript",
-  "version": "0.6.1",
+  "version": "0.9.19",
   "private": true,
   "description": "Configurable greetings and assisted applications on BOSS, Liepin, Zhaopin, 51job and Shixiseng.",
   "scripts": {
@@ -11,10 +11,42 @@
     "test:browser": "node tests/browser-smoke.mjs",
     "check": "npm run build && node --check boss-auto-apply.user.js",
     "check:public": "node scripts/check-public.mjs",
-    "docs:screenshots": "npm run build && node scripts/screenshots.mjs"
+    "docs:screenshots": "npm run build && node scripts/screenshots.mjs",
+    "typecheck": "tsc --noEmit",
+    "test:ui": "node tests/ui-browser.mjs",
+    "test:updates": "node tests/updates-browser.mjs",
+    "preview": "node scripts/preview-ui.mjs",
+    "release": "node scripts/release.mjs",
+    "test:floating": "node tests/floating-browser.mjs",
+    "test:platforms": "node tests/platform-audit-browser.mjs",
+    "test:preview": "node tests/preview-browser.mjs",
+    "test:pacing": "node tests/pacing-browser.mjs"
   },
   "license": "MIT",
   "dependencies": {
-    "puppeteer-core": "^24.43.1"
+    "@base-ui/react": "^1.9.0",
+    "@dnd-kit/core": "^6.3.1",
+    "@dnd-kit/sortable": "^10.0.0",
+    "@dnd-kit/utilities": "^3.2.2",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "lucide-react": "^1.63.0",
+    "motion": "^14.7.1",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "react-resizable-panels": "^4.15.0",
+    "tailwind-merge": "^3.7.0",
+    "zustand": "^5.0.16"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.3.3",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "esbuild": "^0.28.2",
+    "postcss": "^8.5.32",
+    "postcss-prefix-selector": "^2.2.1",
+    "puppeteer-core": "^25.16.0",
+    "tailwindcss": "^4.3.3",
+    "typescript": "^7.0.2"
   }
 }

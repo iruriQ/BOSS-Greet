@@ -2,7 +2,7 @@
 
 在 BOSS 网页上筛选岗位、控制投递数量、发送固定或 AI 定制招呼。
 
-当前版本：`0.9.20`。 [安装助手](https://raw.githubusercontent.com/iruriQ/BOSS-Greet/main/boss-auto-apply.user.js) · [最新版下载](https://github.com/iruriQ/BOSS-Greet/releases/latest)
+当前版本：`0.9.21`。 [安装助手](https://raw.githubusercontent.com/iruriQ/BOSS-Greet/main/boss-auto-apply.user.js) · [最新版下载](https://github.com/iruriQ/BOSS-Greet/releases/latest)
 
 ## 有哪些功能
 

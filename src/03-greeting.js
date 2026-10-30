@@ -13,7 +13,7 @@ const GREETING_TOPICS = [
 ];
 
 // Apply during writing, not as another review gate or extra model round.
-const GREETING_PRESENTATION_RULES = "表达顺序：真实曾任岗位或有依据的相关工作年限 → 与招聘要求有关的经历和亮点 → 可运用的已有能力及对工作的帮助。不主动介绍学历、毕业院校、学位、毕业年份或其他无关个人背景，不用这些内容凑字。不要写‘没有某类经验’‘经验不足’‘学历不占优势’等自我否定，也不要用‘虽然缺乏……但是……’铺垫；直接正面介绍已具备的可迁移能力。可以写‘希望将已有的……经验用于支持……’，不能将拟贡献写成已做过该岗位，也不能承诺无依据的业绩数字。曾任岗位和年限必须有原始资料依据；总工作年限不等于某岗位或行业年限，不能把三年工作经验改成三年商品运营经验。不强调短板不代表反转事实：不得直接删掉否定词来捏造能力，保留实习、模拟、参与、协助等对职责和成果有实质意义的限定；必要时换选其他真实经历，以正面且准确的职责范围表达。";
+const GREETING_PRESENTATION_RULES = "以求职者本人第一人称写一段发给招聘方的自然消息，不写简历摘要或无主语的职责清单。问候后的首句必须明确以‘我’为主语，优先写‘我有……的工作经验’或‘我曾担任……’，不用‘现任……，具备……’这类省略句；只在资料明确支持时使用曾任或目前任职，不擅自改变任职时间。后文可在主语承接清楚时自然省略‘我’，不要每个分句都重复‘我’。围绕岗位选择重点，将动作、对象和结果连成完整句子，避免把简历条目机械串联、连用分号或堆砌名词；输出前自行通读一遍，确认主语明确、指代清楚、语句通顺。表达顺序：真实曾任岗位或有依据的相关工作年限 → 与招聘要求有关的经历和亮点 → 可运用的已有能力及对工作的帮助。不主动介绍学历、毕业院校、学位、毕业年份或其他无关个人背景，不用这些内容凑字。不要写‘没有某类经验’‘经验不足’‘学历不占优势’等自我否定，也不要用‘虽然缺乏……但是……’铺垫；直接正面介绍已具备的可迁移能力。可以写‘希望将已有的……经验用于支持……’，不能将拟贡献写成已做过该岗位，也不能承诺无依据的业绩数字。曾任岗位和年限必须有原始资料依据；总工作年限不等于某岗位或行业年限，不能把三年工作经验改成三年商品运营经验。不强调短板不代表反转事实：不得直接删掉否定词来捏造能力，保留实习、模拟、参与、协助等对职责和成果有实质意义的限定；必要时换选其他真实经历，以正面且准确的职责范围表达。";
 
 function greetingBackgroundOnly(text) {
   // Select whole source sentences instead of erasing negations/qualifiers.
@@ -21,9 +21,16 @@ function greetingBackgroundOnly(text) {
   return /毕业于|(?:我的?|本人)?学历(?:为|是|：|:)|(?:本科|专科|大专|硕士|博士|学士|高中|中专)(?:学历|学位|毕业|在读)|(?:毕业|就读)(?:院校|学校)|(?:缺乏|缺少|没有|暂无|尚无|不具备|无)(?:[^，。！？；]{0,12})(?:经验|经历|背景|学历)|(?:经验|经历|学历)(?:不足|欠缺|不占优势)/.test(text);
 }
 
+function greetingFirstPersonIntro(text) {
+  // Repair only an unambiguous subject omission in the local-template intro.
+  // Keep role text, dates and the original source untouched; do not infer tenure.
+  return text.replace(/^(现任|曾任|目前担任|曾担任|担任)(?=[^，。！？；]+)/,
+    (_, verb) => ({ 现任: "我目前担任", 曾任: "我曾担任", 目前担任: "我目前担任", 曾担任: "我曾担任", 担任: "我担任" })[verb]);
+}
+
 function getGreetingPositiveIntro(settings) {
   const sentences = normalizeText(settings.candidateIntro).match(/[^。！？]+[。！？]?/g) || [];
-  return getGreetingIntro({ ...settings, candidateIntro: sentences.filter(text => !greetingBackgroundOnly(text)).join("") });
+  return getGreetingIntro({ ...settings, candidateIntro: sentences.filter(text => !greetingBackgroundOnly(text)).map(greetingFirstPersonIntro).join("") });
 }
 
 function greetingKeywordHits(text, words) {

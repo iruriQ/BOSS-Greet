@@ -58,6 +58,8 @@ test('生成阶段统一正面表达且不新增风格核验，完整来源仍�
   assert.match(prompt,/真实曾任岗位/);assert.match(prompt,/不主动介绍学历/);
   assert.match(prompt,/不要写‘没有某类经验’/);assert.match(prompt,/总工作年限不等于某岗位或行业年限/);
   assert.match(prompt,/不能承诺无依据的业绩数字/);
+  assert.match(prompt,/首句必须明确以‘我’为主语/);assert.match(prompt,/不写简历摘要/);
+  assert.match(prompt,/不擅自改变任职时间/);assert.match(prompt,/不要每个分句都重复‘我’/);
   const input=JSON.parse(h.requests[0].messages[1].content);
   assert.match(input.candidateIntro,/示例大学/);assert.equal(input.requiredExperience,'三年工作经验');
   assert.match(h.requests[1].messages[0].content,/省略学历和自我否定不等于编造/);
@@ -70,6 +72,30 @@ test('事实修正沿用正面表达规则，不为建议另开风格改写轮�
   await h.run('requestGreetingRepair({...draft,text:draft.text+"旧句。"},review,[],job,{postDescription:"合同整理"},config)');
   assert.equal(h.requests.length,1);assert.match(h.requests[0].messages[0].content,/不主动介绍学历/);
   assert.match(h.requests[0].messages[0].content,/实习、模拟、参与、协助/);
+  assert.match(h.requests[0].messages[0].content,/首句必须明确以‘我’为主语/);
+});
+
+test('本地简介补齐任职句的主语，保留当前或过去时态，不改角色、数字及原始简介',()=>{
+  const h=setup();
+  for(const [source,expected] of [
+    ['现任运营助理，具备项目支持经验。','我目前担任运营助理，具备项目支持经验。'],
+    ['曾任数据助理，协助整理报表。','我曾担任数据助理，协助整理报表。'],
+    ['目前担任行政助理。','我目前担任行政助理。'],
+    ['我有三年工作经验。','我有三年工作经验。'],
+  ]) {
+    h.context.intro=source;h.run('config.candidateIntro=intro;config.candidateExperience=""');
+    assert.equal(h.run('getGreetingPositiveIntro(config)'),expected);
+    assert.equal(h.run('config.candidateIntro'),source);
+  }
+});
+
+test('学历句移除后仍以本人为主语，篇幅整理也收到自然消息要求',async()=>{
+  const h=setup([draft]);h.run("config.candidateIntro='我毕业于示例大学。现任运营助理，负责日常业务支持。';config.candidateExperience=''");
+  assert.match(h.run('getGreetingPositiveIntro(config)'),/^我目前担任运营助理/);
+  h.run("config.candidateExperience='三年工作经验'");
+  await h.run('compressBossGreeting(job,{postDescription:"合同资料整理"},getGreetingFacts(config),["E1","E2","E3"],config)');
+  assert.match(h.requests[0].messages[0].content,/首句必须明确以‘我’为主语/);
+  assert.match(h.requests[0].messages[0].content,/避免把简历条目机械串联/);
 });
 
 test('用户确认的固定原文不受AI表达规则改写，不调用模型',async()=>{

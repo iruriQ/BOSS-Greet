@@ -342,6 +342,10 @@ async function applyBossJob(job, detail) {
     recordBossGreeting(job, "opening");
     try {
       const contact = await openBossConversation(job);
+      if (contact.jobMismatch && contact.skipped && !contact.ok && !contact.limited) {
+        recordBossGreeting(job, "job-mismatch", { sendAttempted: false, reason: contact.message });
+        return contact;
+      }
       const quotaReminder = isInformationalBossQuotaReminder(contact);
       if (!contact.ok || (contact.softSuccess && !quotaReminder)) {
         recordBossGreeting(job, "contact-unconfirmed");

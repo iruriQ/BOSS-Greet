@@ -406,6 +406,17 @@
     }
 
     const limited = isHardLimitMessage(fullMessage);
+    // 只处理平台明确给出的单岗位经历不匹配；不点击继续、不重试该岗位。
+    // 账号/验证/频率等限制优先，其他未知提醒仍保留人工检查。
+    if (!limited && isBossJobExperienceMismatch(fullMessage)) {
+      return {
+        ok: false,
+        skipped: true,
+        jobMismatch: true,
+        message: `BOSS 提示该岗位工作经历不匹配，未继续开聊或发送话术；继续筛选其他岗位：${fullMessage}`,
+        raw: data,
+      };
+    }
     const isChatRemind =
       Boolean(chatRemindDialog) || /开聊提醒/.test(fullMessage);
     if (isChatRemind && !limited && config.treatChatRemindAsSuccess) {
@@ -590,6 +601,10 @@
     return /上限|今日沟通人数已达|频繁|验证|验证码|登录|失效|安全|风控|异常|稍后|暂时无法|账号/.test(
       text,
     );
+  }
+
+  function isBossJobExperienceMismatch(message) {
+    return /工作(?:经验|经历)(?:与(?:该)?(?:岗位|职位)(?:要求)?)?不匹配/.test(normalizeText(message || ""));
   }
 
   function debugBossResponse(job, response, data) {

@@ -63,7 +63,7 @@ try {
   assert.equal(await page.evaluate(()=>window.__demoAIRequests.length),2);
   await page.evaluate(()=>{const content=document.querySelector('.nova-content'),preview=document.querySelector('[data-card="preview"]');content.scrollTop+=preview.getBoundingClientRect().top-content.getBoundingClientRect().top-12;});
   await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
-  await (await page.$('[data-boss-nova]')).screenshot({path:resolve(output,'demo-greeting-preview.png')});
+  await (await page.$('.nova-card-preview')).screenshot({path:resolve(output,'demo-greeting-preview.png')});
   // Default fixed mode uses the real confirmation/preview flow and calls no model.
   await page.select('[name="bossGreetingMode"]','fixed');
   await page.waitForSelector('[name="bossFixedGreeting"]');
@@ -76,7 +76,7 @@ try {
   await page.waitForFunction(()=>document.querySelector('.aj-preview-box')?.textContent.includes('用户已确认原文'));
   assert.equal(await page.evaluate(()=>window.__demoAIRequests.length),2);
   await page.click('[data-nav="greeting"]');
-  await (await page.$('[data-boss-nova]')).screenshot({path:resolve(output,'demo-configuration.png')});
+  await (await page.$('[data-card="greeting"] .nova-card')).screenshot({path:resolve(output,'demo-configuration.png')});
   await page.click('[data-nav="filters"]');
   await (await page.$('[data-boss-nova]')).screenshot({path:resolve(output,'demo-nova-workbench.png')});
   assert.deepEqual(errors,[]);

@@ -66,8 +66,8 @@ try {
       const requestBody=JSON.parse(options.data);
       if(requestBody.messages[0].content.includes('修正编辑')) {
         const input=JSON.parse(requestBody.messages[1].content);
-        const text=input.requiredOpening+'，'+(input.requiredExperience?'我有'+input.requiredExperience+'。':'')+input.candidateFacts[0].text+'期待与您沟通。';
-        options.onload({status:200,responseText:JSON.stringify({choices:[{message:{content:JSON.stringify({text,evidenceIds:[input.candidateFacts[0].id]})}}]})});return;
+        const text=input.requiredOpening+'，'+(input.requiredExperience?'我有'+input.requiredExperience+'。':'')+input.candidateIntro+'看到贵司发布的“'+input.jobTitle+'”岗位，希望进一步了解具体工作安排。我的经历主要包括：'+input.candidateFacts.map(f=>f.text).join('')+'期待结合实际岗位职责进一步沟通。';
+        options.onload({status:200,responseText:JSON.stringify({choices:[{message:{content:JSON.stringify({text,evidenceIds:input.candidateFacts.map(f=>f.id)})}}]})});return;
       }
       const reject = window.__rejectReview === true || window.__rejectNextReview === true;
       window.__rejectNextReview=false;

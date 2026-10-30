@@ -7,7 +7,7 @@ const APP_ID = "boss-auto-apply-custom"; // @build-identity
   const RESUME_KEY = `${APP_ID}:resume`;
   const PANEL_ID = `${APP_ID}-panel`;
   const STYLE_ID = `${APP_ID}-style`;
-  const VERSION = "0.9.19";
+  const VERSION = "0.9.20";
   // 私人构建时替换此对象；公开源码和普通构建不包含个人简历。
   const DEFAULT_CANDIDATE = { intro: "", profile: "" }; // @personal-profile
   const DEFAULT_AI_SERVICE = { endpoint: "", model: "", httpOrigin: "" }; // @personal-service
@@ -55,7 +55,7 @@ const APP_ID = "boss-auto-apply-custom"; // @build-identity
     candidateBossResumeText: "",
     candidateProfileBackup: "",
     candidateProfileSource: "manual",
-    bossGreetingMaxLength: 360,
+    bossGreetingMaxLength: 300,
     bossGreetingUseAI: !PERSONAL_BUILD,
     bossGreetingIncludeAI: PERSONAL_BUILD,
     autoRecoveryEnabled: PERSONAL_BUILD,

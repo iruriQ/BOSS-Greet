@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 export const root = fileURLToPath(new URL('../', import.meta.url));
-export function harness(extraFiles = [], overrides = {}, { bossPacing = false, bossGreetingGuard = false } = {}) {
+export function harness(extraFiles = [], overrides = {}, { bossPacing = false, bossGreetingGuard = false, greetingTargetLength = false } = {}) {
   const values = new Map();
   const calls = [];
   const context = vm.createContext({
@@ -26,6 +26,9 @@ export function harness(extraFiles = [], overrides = {}, { bossPacing = false, b
   if (!bossPacing) run('waitForBossOperation=async()=>{};waitForBossJobGap=async()=>{}');
   // Delivery suites isolate the platform-setting API; ownership has its own live-code tests.
   if (!bossGreetingGuard) run('ensureBossNativeGreetingDisabled=async()=>{}');
+  // Small legacy fixtures isolate matching/fact review/delivery. Real target-length
+  // enforcement, repair and dispatch are exercised separately with full resume fixtures.
+  if (!greetingTargetLength) run(`getGreetingLengthRange=(settings=config)=>({targetCharacters:settings.bossGreetingMaxLength,minCharacters:0,maxCharacters:settings.bossGreetingMaxLength})`);
   return { context, run, values, calls };
 }
 // 下列人物经历、数量和成果均为虚构测试数据。

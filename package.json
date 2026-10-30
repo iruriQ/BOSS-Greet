@@ -1,6 +1,6 @@
 {
   "name": "boss-auto-apply-userscript",
-  "version": "0.9.19",
+  "version": "0.9.20",
   "private": true,
   "description": "Configurable greetings and assisted applications on BOSS, Liepin, Zhaopin, 51job and Shixiseng.",
   "scripts": {
@@ -20,7 +20,8 @@
     "test:floating": "node tests/floating-browser.mjs",
     "test:platforms": "node tests/platform-audit-browser.mjs",
     "test:preview": "node tests/preview-browser.mjs",
-    "test:pacing": "node tests/pacing-browser.mjs"
+    "test:pacing": "node tests/pacing-browser.mjs",
+    "test:target-length": "node tests/target-length-browser.mjs"
   },
   "license": "MIT",
   "dependencies": {

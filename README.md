@@ -2,7 +2,7 @@
 
 在 BOSS 网页上筛选岗位、控制投递数量、发送固定或 AI 定制招呼。
 
-当前版本：`0.9.19`。 [安装助手](https://raw.githubusercontent.com/iruriQ/BOSS-Greet/main/boss-auto-apply.user.js) · [最新版下载](https://github.com/iruriQ/BOSS-Greet/releases/latest)
+当前版本：`0.9.20`。 [安装助手](https://raw.githubusercontent.com/iruriQ/BOSS-Greet/main/boss-auto-apply.user.js) · [最新版下载](https://github.com/iruriQ/BOSS-Greet/releases/latest)
 
 ## 有哪些功能
 
@@ -11,7 +11,7 @@
 | 岗位筛选 | 按关键词、公司规模、距家距离、招聘方在线及活跃度筛选 |
 | 控制数量 | 本轮最多投 1—150 个，达到数量自动停止 |
 | 固定话术 | 填写并确认一段招呼，按原文发送，无需 AI API |
-| AI 定制 | 根据本人真实经历和岗位要求生成不同话术，发送前核验重大事实 |
+| AI 定制 | 按真实经历生成，目标 300 字时至少 200 字，可补简历亮点并核验重大事实 |
 | 简历资料 | 上传或粘贴文本，也可读取本人 BOSS 在线简历，核对后使用 |
 | 话术预览 | 先筛出合适岗位，再预览招呼；预览不开聊、不发送 |
 | 投递进度 | 查看扫描、匹配、投递和跳过数量，以及处理原因 |

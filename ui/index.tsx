@@ -293,7 +293,7 @@ function GreetingSettings() {
         <Field name="candidateIntro" label="我的简介（一句话，可留空）" />
         <Field name="candidateExperience" label="真实工作年限" />
         <ResumeSource />
-        <Field name="bossGreetingMaxLength" label="话术字数上限（180—500）" type="number" min={180} max={500} help="优先保留岗位相关经历，自动精简重复介绍与次要内容；不修改你的原始简历。" />
+        <Field name="bossGreetingMaxLength" label="目标字数（180—500）" type="number" min={180} max={500} help={`目标约 ${Number(model.config.bossGreetingMaxLength) || 300} 字，至少 ${Math.ceil((Number(model.config.bossGreetingMaxLength) || 300) * 2 / 3)} 字且不超过目标（标点计入）。岗位信息不足时，补充已确认简历中的真实亮点。`} />
         <Disclosure title="AI 服务（仅此模式需要）" icon={Sparkles}>
           <p className="nova-help">经历、岗位描述和话术将发送到你配置的服务。发送前仅核验重大事实风险，普通优化建议不拦截。</p>
           <CheckField name="bossGreetingUseAI">使用 AI 生成岗位定制话术</CheckField>

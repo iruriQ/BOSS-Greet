@@ -112,7 +112,7 @@
     output.greetingOpening = typeof output.greetingOpening === "string" ? output.greetingOpening.replace(/\s+/g, " ").trim().slice(0, 30) : "";
     const length = Number(output.bossGreetingMaxLength);
     output.bossGreetingMaxLength = Number.isFinite(length)
-      ? Math.max(180, Math.min(500, Math.floor(length))) : 360;
+      ? Math.max(180, Math.min(500, Math.floor(length))) : 300;
     delete output.greetingAPIKey;
 
     output.bossDistanceEnabled = output.bossDistanceEnabled === true;

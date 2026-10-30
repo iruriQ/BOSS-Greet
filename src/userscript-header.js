@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         BOSS 岗位定制招呼助手
 // @namespace    local.boss-auto-apply.custom
-// @version      0.9.19
+// @version      0.9.20
 // @description  固定话术确认后投递，无需 API；可选 AI 按经历和岗位要求定制并校对招呼语，支持距家筛选。
 // @author       iruriQ (based on plove / muyuniao)
 // @homepageURL  https://github.com/iruriQ/BOSS-Greet

@@ -80,6 +80,7 @@
       roundLimit: state.roundLimit || config.maxApplyCount,
       roundUsed: roundUsedCount(adapter),
       config: { ...config },
+      personalAIWorkflows: hasPersonalAIWorkflows(),
       hasKey: Boolean(greetingAPIKey),
       previewError: state.greetingPreviewError || "",
       previewProgress: state.bossPacingMessage || state.greetingPreviewProgress || "",

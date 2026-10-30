@@ -4,7 +4,7 @@
 
 **适用范围：下列功能介绍与安装步骤均以 BOSS 直聘为主。猎聘、智联招聘、前程无忧和实习僧仅保留部分基础适配，功能不完整，未完成与 BOSS 同等范围的验证，暂不建议用于这些平台。**
 
-当前版本：`0.9.22`。 [安装助手](https://raw.githubusercontent.com/iruriQ/BOSS-Greet/main/boss-auto-apply.user.js) · [最新版下载](https://github.com/iruriQ/BOSS-Greet/releases/latest)
+当前版本：`0.9.23`。 [安装助手](https://raw.githubusercontent.com/iruriQ/BOSS-Greet/main/boss-auto-apply.user.js) · [最新版下载](https://github.com/iruriQ/BOSS-Greet/releases/latest)
 
 ## 有哪些功能
 

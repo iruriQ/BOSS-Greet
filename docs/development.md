@@ -68,6 +68,8 @@ npm run build:personal
 
 私人产物位于 `dist-private/boss-auto-apply-personal.user.js`，保留既有私人构建的安装身份和存储键，与通用版分开。私人构建默认使用 AI 定制模式、保留额外 AI 亮点、采用本地匹配，已保存的面板偏好优先。`candidate.private.json` 和整个 `dist-private/` 均被 Git 忽略，只在本机使用。普通 `npm run build` 不读取私人文件。
 
+可选 `aiWorkflows` 是仅私人构建载入的案例数组，每项含 `text`（已核对的真实事实）、`matchTerms`（招聘职责匹配词）和可选 `fallback: true`（无直接匹配时的通用概括）。启用该案例库后，每条定制话术按招聘职责保留一项 AI 案例，相关案例与普通简历事实一起核验；未选案例及其数字不进入该岗位生成与修正输入。原有简历不被覆盖，固定话术不受影响。普通构建的案例库始终为空；只保存通用机制与虚构测试，不提交私人案例。独立验证运行 `npm run test:personal-workflows`，拦截所有网络请求。
+
 既有私人副本的更新保留 BOSS、猎聘、智联的网站适用范围；通用版仍支持上述五个平台。
 
 ## 发布新版

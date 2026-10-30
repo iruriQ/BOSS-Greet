@@ -38,6 +38,7 @@ export interface PanelModel {
   roundUsed?: number;
   config: Config;
   hasKey: boolean;
+  personalAIWorkflows?: boolean;
   previewError?: string;
   previewProgress?: string;
   logs: { time: string; level: string; message: string }[];

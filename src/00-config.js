@@ -7,10 +7,11 @@ const APP_ID = "boss-auto-apply-custom"; // @build-identity
   const RESUME_KEY = `${APP_ID}:resume`;
   const PANEL_ID = `${APP_ID}-panel`;
   const STYLE_ID = `${APP_ID}-style`;
-  const VERSION = "0.9.22";
+  const VERSION = "0.9.23";
   // 私人构建时替换此对象；公开源码和普通构建不包含个人简历。
   const DEFAULT_CANDIDATE = { intro: "", profile: "" }; // @personal-profile
   const DEFAULT_AI_SERVICE = { endpoint: "", model: "", httpOrigin: "" }; // @personal-service
+  const PERSONAL_AI_WORKFLOWS = []; // @personal-ai-workflows
   const GREETING_LEDGER_KEY = `${APP_ID}:boss-greetings`;
 
   const BOSS_COMPANY_SIZES = ["0-20人", "20-99人", "100-499人", "500-999人", "1000-9999人", "10000人以上"];

@@ -13,7 +13,8 @@ try { privateProfile=JSON.parse(await readFile(resolve(root,'candidate.private.j
 catch(error) { if(error.code!=='ENOENT') throw error; }
 const privateNeedles=[];
 if(privateProfile) {
-  for(const text of [privateProfile.intro,...String(privateProfile.profile||'').split(/\r?\n/),privateProfile.service?.endpoint]) {
+  for(const text of [privateProfile.intro,...String(privateProfile.profile||'').split(/\r?\n/),
+    ...(privateProfile.aiWorkflows || []).map(item => item.text),privateProfile.service?.endpoint]) {
     if(typeof text==='string' && text.trim().length>=12) privateNeedles.push(text.trim());
   }
   if(privateProfile.service?.endpoint) privateNeedles.push(new URL(privateProfile.service.endpoint).hostname);

@@ -21,5 +21,16 @@ export function applyBuildVariant(header, config, profile = null) {
   config = replaceRequired(config,
     'const DEFAULT_AI_SERVICE = { endpoint: "", model: "", httpOrigin: "" }; // @personal-service',
     `const DEFAULT_AI_SERVICE = ${JSON.stringify({ endpoint: service.endpoint || "", model: service.model || "", httpOrigin: service.httpOrigin || "" })}; // @personal-service`);
+  const workflows = profile.aiWorkflows || [];
+  if (!Array.isArray(workflows) || workflows.length > 10 || workflows.some(item =>
+    !item || typeof item.text !== "string" || !item.text.trim() || item.text.length > 2000 ||
+    !Array.isArray(item.matchTerms) || item.matchTerms.length > 30 ||
+    item.matchTerms.some(term => typeof term !== "string" || !term.trim() || term.length > 40))) {
+    throw new Error("私人 AI 工作流需要有效正文和岗位匹配词");
+  }
+  config = replaceRequired(config, 'const PERSONAL_AI_WORKFLOWS = []; // @personal-ai-workflows',
+    `const PERSONAL_AI_WORKFLOWS = ${JSON.stringify(workflows.map(item => ({
+      text: item.text.trim(), matchTerms: item.matchTerms.map(term => term.trim()), fallback: item.fallback === true,
+    })))}; // @personal-ai-workflows`);
   return { header, config };
 }

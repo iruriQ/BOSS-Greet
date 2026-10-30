@@ -289,7 +289,7 @@ function GreetingSettings() {
       </> : <>
         <div className="nova-inline-note"><Sparkles size={17} /><span>按真实经历生成 → 重大事实核验 → 通过后发送</span></div>
         <Field name="greetingOpening" label="开场问候" placeholder="留空默认使用“您好”" maxLength={30} help="可填写自己的开场问候；留空时默认使用“您好”。" />
-        <CheckField name="bossGreetingIncludeAI">字数允许时补充经历中的 AI 提效亮点</CheckField>
+        {model.personalAIWorkflows ? <p className="nova-help">个人版：每条定制话术按岗位职责选择一项真实 AI 工作流亮点。</p> : <CheckField name="bossGreetingIncludeAI">字数允许时补充经历中的 AI 提效亮点</CheckField>}
         <Field name="candidateIntro" label="我的简介（一句话，可留空）" />
         <Field name="candidateExperience" label="真实工作年限" />
         <ResumeSource />

@@ -1,9 +1,10 @@
 import vm from 'node:vm';
+import {applyBuildVariant} from '../scripts/build-variant.mjs';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 export const root = fileURLToPath(new URL('../', import.meta.url));
-export function harness(extraFiles = [], overrides = {}, { bossPacing = false, bossGreetingGuard = false, greetingTargetLength = false } = {}) {
+export function harness(extraFiles = [], overrides = {}, { bossPacing = false, bossGreetingGuard = false, greetingTargetLength = false, personalProfile = null } = {}) {
   const values = new Map();
   const calls = [];
   const context = vm.createContext({
@@ -18,7 +19,10 @@ export function harness(extraFiles = [], overrides = {}, { bossPacing = false, b
     ...overrides,
   });
   const files = ['00-config.js', '02-storage.js', '03-utils.js', '03-resume.js', '03-greeting.js', '03-proofread.js', '03-distance.js', '03-recovery.js', '03-greeting-ownership.js', '03-updates.js', ...extraFiles];
-  vm.runInContext(files.map(file => readFileSync(resolve(root, 'src', file), 'utf8')).join('\n'), context);
+  vm.runInContext(files.map(file => {
+    const source=readFileSync(resolve(root, 'src', file), 'utf8');
+    return file === '00-config.js' && personalProfile ? applyBuildVariant(readFileSync(resolve(root,'src/userscript-header.js'),'utf8'),source,personalProfile).config : source;
+  }).join('\n'), context);
   const run = (code) => vm.runInContext(code, context);
   run(`function log(){}; function renderPanel(){}; function formatJob(job){return job.jobName + ' - ' + job.brandName};`);
   // Most suites isolate filtering/delivery. Real shared-clock pacing is tested

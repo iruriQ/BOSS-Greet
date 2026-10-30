@@ -18,7 +18,7 @@ const model: PanelModel = {
   config: { bossPersonalizedGreeting: true, bossGreetingMode: "fixed", bossGreetingPreviewOnly: true,
     maxApplyCount: 20, bossFixedGreeting: greeting, bossFixedGreetingConfirmed: false, onlyOnlineBoss: true,
     bossMaxDistanceKm: 10, bossDistanceEnabled: false, bossHomeLocation: null,
-    includeDescriptionKeywords: ["商务支持", "项目协调"], excludeDescriptionKeywords: ["电话销售"], bossCompanySizes: ["100-499人", "500-999人"], debug: false,
+    excludeTitleKeywords: [], includeDescriptionKeywords: ["商务支持", "项目协调"], excludeDescriptionKeywords: ["电话销售"], bossCompanySizes: ["100-499人", "500-999人"], debug: false,
     greetingOpening: "", candidateIntro: "", candidateExperience: "", candidateProfile: "",
     candidateResumeSource: "text", candidateResumeText: "", candidateBossResumeText: "", candidateProfileBackup: "", candidateProfileSource: "manual",
     bossGreetingMaxLength: 300, bossGreetingUseAI: true, bossGreetingIncludeAI: false,
@@ -71,7 +71,7 @@ function saveFields(event: Event) {
     const checkbox = element.querySelector<HTMLInputElement>('[name="bossFixedGreetingConfirmed"]');
     if (checkbox) checkbox.checked = false;
   }
-  if (["bossPersonalizedGreeting", "bossGreetingMode", "includeDescriptionKeywords", "excludeDescriptionKeywords", "bossCompanySizes", "bossDistanceEnabled", "bossMaxDistanceKm", "onlyOnlineBoss"].includes(input.name)) {
+  if (["bossPersonalizedGreeting", "bossGreetingMode", "excludeTitleKeywords", "includeDescriptionKeywords", "excludeDescriptionKeywords", "bossCompanySizes", "bossDistanceEnabled", "bossMaxDistanceKm", "onlyOnlineBoss"].includes(input.name)) {
     model.preview = null; model.previewProgress = ""; model.previewError = "";
   }
   render();
@@ -171,6 +171,7 @@ element.addEventListener("click", event => {
       return [];
     };
     const include = items(model.config.includeDescriptionKeywords), exclude = items(model.config.excludeDescriptionKeywords);
+    const excludedTitles = items(model.config.excludeTitleKeywords).map(word => word.toLowerCase());
     const sizes = items(model.config.bossCompanySizes);
     const jobs = [
       { title: "客户顾问 · 虚构示例", jd: "电话销售 客户服务", size: "20-99人", distance: 30.57 },
@@ -181,7 +182,8 @@ element.addEventListener("click", event => {
     const job = jobs.find(job => {
       checked++;
       const text = `${job.title} ${job.jd}`.toLowerCase();
-      return (!sizes.length || sizes.includes(job.size)) &&
+      return !excludedTitles.some(word => job.title.toLowerCase().includes(word)) &&
+        (!sizes.length || sizes.includes(job.size)) &&
         (!model.config.bossDistanceEnabled || job.distance <= Number(model.config.bossMaxDistanceKm)) &&
         (include.length ? include.some(word => text.includes(word.toLowerCase())) : !exclude.some(word => text.includes(word.toLowerCase())));
     });

@@ -489,9 +489,10 @@ async function findBossGreetingPreviewJob(adapter) {
         // Fixed text also needs details for activity, distance, size and keyword
         // checks; fetching detail does not call an AI service or open a chat.
         await waitForBossJobGap();
-        detail = await adapter.fetchDetail(job);
+        const titleFilter = filterJobTitle(job);
+        if (!titleFilter.ok) filter = titleFilter;
+        else { detail = await adapter.fetchDetail(job); readFailures = 0; }
         if (state.stopping) throw new Error("已停止筛选预览");
-        readFailures = 0;
       } catch (error) {
         if (error.code === "BOSS_PLATFORM_BLOCKED") throw error;
         if (state.stopping) throw new Error("已停止筛选预览，未开聊或发送消息");

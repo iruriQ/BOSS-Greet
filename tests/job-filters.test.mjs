@@ -29,6 +29,37 @@ test('包含词是或的关系，包含优先；没有包含词时排除词才�
   h.run(`config.excludeDescriptionKeywords=[]`);
   assert.equal(h.run('applyFilters(job,detail,adapter).ok'), true);
 });
+test('岗位名称排除词独立保存，多词为或，命中时详情包含词不能放行',()=>{
+  const h=setup();
+  assert.deepEqual(Array.from(h.run('normalizeConfig({}).excludeTitleKeywords')),[]);
+  h.run(`saveConfig({...config,excludeTitleKeywords:['销售','实习','销售',''],includeDescriptionKeywords:['商务']},true);job.jobName='商务销售助理'`);
+  assert.deepEqual(Array.from(h.run('loadConfig().excludeTitleKeywords')),['销售','实习']);
+  assert.match(h.run('applyFilters(job,detail,adapter).reason'),/岗位名称.*「销售」/);
+  h.run(`job.jobName='商务实习生'`);assert.match(h.run('applyFilters(job,detail,adapter).reason'),/「实习」/);
+  h.run(`config.excludeTitleKeywords=[]`);assert.equal(h.run('applyFilters(job,detail,adapter).ok'),true);
+});
+test('名称排除只读取标题，不因详情、公司名、标签含排除词而误判',()=>{
+  const h=setup();h.run(`config.excludeTitleKeywords=['销售'];job.jobName='商务助理';job.brandName='销售示例公司';job.jobLabels=['销售'];job.filterText='销售';detail.postDescription='销售部门商务支持'`);
+  assert.equal(h.run('applyFilters(job,detail,adapter).ok'),true);
+});
+test('名称匹配不区分英文大小写并按文字包含匹配，不把符号当正则；无法读取名称时明确跳过',()=>{
+  const h=setup();h.run(`config.excludeTitleKeywords=['HR','C++'];job.jobName='hr招聘助理'`);
+  assert.match(h.run('applyFilters(job,detail,adapter).reason'),/「HR」/);
+  h.run(`job.jobName='C++开发工程师'`);assert.match(h.run('applyFilters(job,detail,adapter).reason'),/「C\+\+」/);
+  h.run(`job.jobName='C语言开发工程师'`);assert.equal(h.run('applyFilters(job,detail,adapter).ok'),true);
+  h.run(`job.jobName=''`);assert.match(h.run('applyFilters(job,detail,adapter).reason'),/无法读取岗位名称/);
+});
+test('固定、AI及BOSS默认三种模式均在读取详情或调用投递前跳过排除标题，不占投递数量',async()=>{
+  for(const mode of ['fixed','ai','platform']){
+    const h=setup(),reads=[],applies=[];h.context.mode=mode;
+    h.context.adapter.fetchDetail=async()=>{reads.push(true);throw Error('不应读取详情')};
+    h.context.applyWithAutoRecovery=async()=>{applies.push(true);throw Error('不应生成话术或开聊')};
+    h.run(`config.bossGreetingMode=mode==='fixed'?'fixed':'ai';config.bossPersonalizedGreeting=mode!=='platform';config.excludeTitleKeywords=['销售'];job.jobName='商务销售';state.running=true`);
+    await h.run('handleOneJob(job,adapter,null)');
+    assert.equal(reads.length,0);assert.equal(applies.length,0);assert.equal(h.calls.length,0);
+    assert.deepEqual(Array.from(h.run('[state.scanned,state.skipped,state.matched,state.submitted,state.applied]')),[1,1,0,0,0]);
+  }
+});
 test('关键词启用时完整详情读取失败不能用列表摘要误判通过', async () => {
   const h = setup();
   h.run(`config.excludeDescriptionKeywords=['电话销售'];adapter.fetchDetail=async()=>{throw Error('超时')}`);

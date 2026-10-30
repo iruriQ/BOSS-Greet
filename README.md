@@ -4,13 +4,13 @@
 
 **适用范围：下列功能介绍与安装步骤均以 BOSS 直聘为主。猎聘、智联招聘、前程无忧和实习僧仅保留部分基础适配，功能不完整，未完成与 BOSS 同等范围的验证，暂不建议用于这些平台。**
 
-当前版本：`0.9.23`。 [安装助手](https://raw.githubusercontent.com/iruriQ/BOSS-Greet/main/boss-auto-apply.user.js) · [最新版下载](https://github.com/iruriQ/BOSS-Greet/releases/latest)
+当前版本：`0.9.24`。 [安装助手](https://raw.githubusercontent.com/iruriQ/BOSS-Greet/main/boss-auto-apply.user.js) · [最新版下载](https://github.com/iruriQ/BOSS-Greet/releases/latest)
 
 ## 有哪些功能
 
 | 功能 | 怎么用 |
 | --- | --- |
-| 岗位筛选 | 按关键词、公司规模、距家距离、招聘方在线及活跃度筛选 |
+| 岗位筛选 | 按岗位名称排除词、详情关键词、公司规模、距家距离、招聘方在线及活跃度筛选 |
 | 控制数量 | 本轮最多投 1—150 个，达到数量自动停止 |
 | 三种招呼方式 | BOSS 平台默认、自己填写固定话术、AI 按岗位定制，具体选择见下表 |
 | 简历资料 | 上传或粘贴文本，也可读取本人 BOSS 在线简历，核对后使用 |

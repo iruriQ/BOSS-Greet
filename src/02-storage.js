@@ -77,6 +77,7 @@
     output.maxApplyCount = normalizeApplyLimit(output.maxApplyCount);
     output.includeDescriptionKeywords = normalizeKeywordEntries(output.includeDescriptionKeywords);
     output.excludeDescriptionKeywords = normalizeKeywordEntries(output.excludeDescriptionKeywords);
+    output.excludeTitleKeywords = normalizeKeywordEntries(output.excludeTitleKeywords);
     output.bossCompanySizes = normalizeCompanySizes(output.bossCompanySizes);
     // Timing is internal; discard old user-configurable interval values.
     for (const key of ["bossReadIntervalSec", "bossContactIntervalSec", "bossSendIntervalSec"]) delete output[key];

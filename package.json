@@ -1,6 +1,6 @@
 {
   "name": "boss-auto-apply-userscript",
-  "version": "0.9.23",
+  "version": "0.9.24",
   "private": true,
   "description": "Configurable greetings and assisted applications on BOSS, Liepin, Zhaopin, 51job and Shixiseng.",
   "scripts": {

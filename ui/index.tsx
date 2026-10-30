@@ -174,6 +174,7 @@ function Filters() {
     </Disclosure>
     <CheckField name="onlyOnlineBoss">{model.onlineLabel}</CheckField>
     {model.platformId === "boss" && <p className="nova-help">根据 BOSS 直聘显示的 HR／招聘方在线标记筛选；未显示在线或无法确认时跳过。</p>}
+    <KeywordFields name="excludeTitleKeywords" label="岗位名称排除关键词" help="每框一个词，只检查岗位名称；命中任意一个就跳过，即使岗位详情命中包含词也不投。留空不筛选名称。" />
     <KeywordFields name="includeDescriptionKeywords" label="岗位详情包含关键词" help="每框一个词，命中任意一个即可。留空表示不限。" />
     <KeywordFields name="excludeDescriptionKeywords" label="岗位详情排除关键词" help="有包含词时以包含词为准，同时命中也可投；未填包含词时，命中任意排除词则跳过。" />
     {model.platformId === "boss" && <CompanySizes />}

@@ -156,7 +156,7 @@
       state.resumeImport.draftText = event.target.value;
       return;
     }
-    if (["includeDescriptionKeywords", "excludeDescriptionKeywords", "bossCompanySizes", "onlyOnlineBoss", "bossDistanceEnabled", "bossMaxDistanceKm"].includes(event.target.name)) {
+    if (["excludeTitleKeywords", "includeDescriptionKeywords", "excludeDescriptionKeywords", "bossCompanySizes", "onlyOnlineBoss", "bossDistanceEnabled", "bossMaxDistanceKm"].includes(event.target.name)) {
       state.lastGreeting = null; state.greetingPreviewError = ""; state.greetingPreviewProgress = "";
     }
     const previousMode = config.bossGreetingMode;

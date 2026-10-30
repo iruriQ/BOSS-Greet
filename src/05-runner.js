@@ -306,10 +306,11 @@
         ((adapter.id === "boss") ||
           splitKeywords(config.includeDescriptionKeywords).length > 0 ||
           splitKeywords(config.excludeDescriptionKeywords).length > 0);
-      const detail = needJobDetail
+      const titleFilter = filterJobTitle(job);
+      const detail = titleFilter.ok && needJobDetail
         ? await safeFetchJobDetail(job, adapter)
         : null;
-      const filter = applyFilters(job, detail, adapter);
+      const filter = titleFilter.ok ? applyFilters(job, detail, adapter) : titleFilter;
       if (!filter.ok) {
         state.skipped += 1;
         log("warn", `跳过【${formatJob(job)}】：${filter.reason}`);
@@ -423,7 +424,18 @@
     }
   }
 
+  function filterJobTitle(job) {
+    const keywords = normalizeKeywordEntries(config.excludeTitleKeywords);
+    if (!keywords.length) return { ok: true, reason: "" };
+    const title = normalizeText(job?.jobName);
+    if (!title) return { ok: false, reason: "无法读取岗位名称，不能确认名称排除条件" };
+    const matched = keywords.find(word => textHasAny(title, [word.toLowerCase()]));
+    return matched ? { ok: false, reason: `岗位名称命中排除关键词「${matched}」` } : { ok: true, reason: "" };
+  }
+
   function applyFilters(job, detail, adapter) {
+    const titleFilter = filterJobTitle(job);
+    if (!titleFilter.ok) return titleFilter;
     if (!adapter.canApply(job)) {
       return { ok: false, reason: adapter.noApplyReason || "缺少投递所需字段" };
     }

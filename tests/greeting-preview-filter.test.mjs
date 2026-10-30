@@ -43,6 +43,13 @@ test('当前批次没有匹配项时只读加载更多，跨批次去重，下�
   assert.deepEqual(h.generated,['next']);assert.deepEqual(h.reads,['first','next']);assert.equal(h.pages[0].probe,true);
   assert.equal(h.run('state.processedKeys.size'),0);
 });
+test('预览先排除岗位名称，命中标题不读取详情也不生成，继续找到可投岗位',async()=>{
+  const h=setup();h.context.jobs=[h.job('title-excluded',{jobName:'商务销售'}),h.job('valid',{jobName:'商务助理'})];
+  h.run(`config.excludeTitleKeywords=['销售'];config.includeDescriptionKeywords=['合同']`);
+  await h.run('previewBossGreeting()');
+  assert.deepEqual(h.reads,['valid']);assert.deepEqual(h.generated,['valid']);assert.equal(h.calls.length,0);
+  assert.match(h.run('state.greetingPreviewProgress'),/已检查 2 个/);assert.equal(h.run('state.submitted'),0);
+});
 test('全部不符合或详情读取失败时不生成，展示汇总原因，不把首个失败当作整个预览失败',async()=>{
   const h=setup();h.context.jobs=[h.job('small',{brandScaleName:'20-99人'}),h.job('unreadable')];
   h.run(`config.bossCompanySizes=['100-499人']`);

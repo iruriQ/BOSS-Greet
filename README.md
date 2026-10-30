@@ -1,6 +1,8 @@
 # BOSS Greet
 
-在 BOSS 网页上筛选岗位、控制投递数量、发送固定或 AI 定制招呼。
+专注于 **BOSS 直聘网页端**的求职投递助手，可筛选岗位、控制投递数量、发送固定或 AI 定制招呼。
+
+**适用范围：下列功能介绍与安装步骤均以 BOSS 直聘为主。猎聘、智联招聘、前程无忧和实习僧仅保留部分基础适配，功能不完整，未完成与 BOSS 同等范围的验证，暂不建议用于这些平台。**
 
 当前版本：`0.9.22`。 [安装助手](https://raw.githubusercontent.com/iruriQ/BOSS-Greet/main/boss-auto-apply.user.js) · [最新版下载](https://github.com/iruriQ/BOSS-Greet/releases/latest)
 
@@ -47,8 +49,6 @@
 **AI 与网络：** 固定话术和筛选无需 API；AI 定制需自己的接口、模型和密钥。VPN 并非必需，取决于能否访问扩展商店、GitHub 及自选 AI 接口。安装后固定模式只需招聘网站可访问。
 
 **资料与使用：** 公开版不含私人简历或密钥；资料保存在本机，AI 模式会发送相关资料到你配置的服务。保持网页打开，只启用一份助手；遇登录异常或验证会暂停，不保证避免平台限制。
-
-BOSS 支持上述功能；猎聘、智联、前程无忧和实习僧沿用原有投递适配，功能范围见详细说明。
 
 [详细使用与常见问题](docs/usage.md) · [开发与发布](docs/development.md) · [历史更新](https://github.com/iruriQ/BOSS-Greet/releases)
 

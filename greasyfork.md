@@ -1,6 +1,8 @@
 # BOSS Greet
 
-筛选岗位、自定投递数量，支持固定招呼与可选 AI 定制。
+专注于 **BOSS 直聘网页端**：筛选岗位、自定投递数量，支持固定招呼与可选 AI 定制。
+
+**其他平台仅保留部分基础适配，功能不完整，未完成同等范围验证，暂不建议用于猎聘、智联招聘、前程无忧或实习僧。以下功能与安装说明均以 BOSS 直聘为主。**
 
 - **投递筛选：** 关键词、公司规模、距家距离、招聘方在线及活跃度。
 - **控制数量：** 本轮最多投 1—150 个，达到数量自动停止。
@@ -24,4 +26,4 @@
 
 [功能截图、安装帮助与详细说明](https://github.com/iruriQ/BOSS-Greet)
 
-BOSS 支持上述功能；其他招聘网站沿用原有适配。基于 ultraplan-bit/boss-auto-apply 和 muyuniao/boss-auto-apply 修改，采用 MIT 许可。
+基于 ultraplan-bit/boss-auto-apply 和 muyuniao/boss-auto-apply 修改，采用 MIT 许可。
